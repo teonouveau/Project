@@ -28,27 +28,13 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Login />} />
 
-        <Route
-          path="/signup"
-          element={
-            <GuestRoute>
-              <Register />
-            </GuestRoute>
-          }
-        />
+        <Route path="/signup" element={<Register />} />
 
         <Route path="/register" element={<Navigate to="/signup" replace />} />
 
-        <Route
-          path="/login"
-          element={
-            <GuestRoute>
-              <Login />
-            </GuestRoute>
-          }
-        />
+        <Route path="/login" element={<Login />} />
 
         <Route
           path="/reset-password"

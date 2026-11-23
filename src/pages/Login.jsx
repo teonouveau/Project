@@ -63,7 +63,7 @@ export default function Login() {
           <div className="field">
             <label htmlFor="login-password" className="label">
               Password
-              <Link to="/reset-password" className="labelLink">Change password?</Link>
+              <Link to="/reset-password" className="labelLink">Forgot password?</Link>
             </label>
             <input
               id="login-password"
@@ -85,7 +85,7 @@ export default function Login() {
 
         <p className="foot">
           Don't have an account?{' '}
-          <Link to="/signup" className="link">Create one</Link>
+          <Link to="/signup" className="link">Sign Up</Link>
         </p>
       </div>
     </div>

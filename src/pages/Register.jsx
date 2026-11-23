@@ -31,7 +31,7 @@ export default function Register() {
     setLoading(true)
     setError('')
     try {
-      const user = await apiRequest('/api/auth/register', {
+      await apiRequest('/api/auth/register', {
         method: 'POST',
         body: {
           name: form.name.trim(),
@@ -39,8 +39,7 @@ export default function Register() {
           password: form.password,
         },
       })
-      localStorage.setItem('skwela_user', JSON.stringify(user))
-      navigate('/homepage')
+      navigate('/login')
     } catch (err) {
       setError(err.message || 'Unable to create account.')
     } finally {
