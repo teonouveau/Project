@@ -52,29 +52,57 @@
 .home-nav-item {
   border: 0;
   background: none;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255,255,255,0.55);
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 20px;
+  gap: 13px;
+  padding: 8px 16px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  border-radius: 0;
   text-align: left;
   transition: background 0.15s, color 0.15s;
   width: 100%;
+  border-radius: 0;
 }
 
-.home-nav-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.home-nav-item:hover {
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.9);
+}
 
 .home-nav-item.active {
-  background: rgba(255,255,255,0.14);
   color: #fff;
+  background: rgba(255,255,255,0.1);
   border-left: 3px solid #5bc0f8;
 }
 
-.home-nav-item .nav-icon { font-size: 17px; width: 22px; text-align: center; }
+.home-nav-item .nav-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.home-nav-item.active .nav-icon {
+  background: #087bc4;
+  color: #fff;
+}
+
+.home-nav-item:hover .nav-icon {
+  background: rgba(255,255,255,0.14);
+}
+
+.home-nav-item small {
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
 
 .home-sidebar-footer {
   padding: 16px 20px;
@@ -597,9 +625,10 @@
   .home-nav-item small,
   .home-sidebar-footer .user-info { display: none; }
   .home-sidebar-brand { justify-content: center; padding: 0; }
-  .home-nav-item { justify-content: center; padding: 12px; }
-  .home-nav-item .nav-icon { margin: 0; }
-  .home-nav-item.active { border-left: 0; border-bottom: 2px solid #5bc0f8; }
+  .home-nav-item { justify-content: center; padding: 10px 0; gap: 0; }
+  .home-nav-item .nav-icon { margin: 0; width: 42px; height: 42px; }
+  .home-nav-item.active { border-left: 0; padding-left: 0; }
+  .home-nav-item.active .nav-icon { background: #087bc4; }
   .home-topbar { left: 64px; }
   .home-content { margin-left: 64px; }
   .home-right { grid-template-columns: 1fr; }

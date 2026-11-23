@@ -9,6 +9,53 @@ const VERSES = [
   { text: '"The beginning of wisdom is this: Get wisdom."', ref: '– Proverbs 4:7' },
 ]
 
+/* ── SVG Nav Icons ────────────────────────────────────────── */
+const IconHome = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+  </svg>
+)
+
+const IconTasks = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="m9 12 2 2 4-4"/>
+  </svg>
+)
+
+const IconSchedule = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/>
+    <path d="M16 2v4M8 2v4M3 10h18"/>
+    <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
+  </svg>
+)
+
+const IconStudy = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+  </svg>
+)
+
+const IconGWA = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <path d="M9 9h1.5a1.5 1.5 0 0 1 0 3H9v3"/>
+    <path d="M9 9V7"/>
+    <path d="M15 9v6"/>
+    <path d="M15 12h-2"/>
+  </svg>
+)
+
+const NAV_ITEMS = [
+  { key: 'home',     icon: <IconHome />,     label: 'Home' },
+  { key: 'tasks',    icon: <IconTasks />,    label: 'Tasks & Events' },
+  { key: 'schedule', icon: <IconSchedule />, label: 'Schedule' },
+  { key: 'study',    icon: <IconStudy />,    label: 'Study' },
+  { key: 'gwa',      icon: <IconGWA />,      label: 'GWA Calculator' },
+]
+
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -130,13 +177,7 @@ export default function Homepage() {
         </div>
 
         <nav className="home-sidebar-nav">
-          {[
-            { key: 'home',     icon: '🏠', label: 'Home' },
-            { key: 'tasks',    icon: '✅', label: 'Tasks & Events' },
-            { key: 'schedule', icon: '📅', label: 'Schedule' },
-            { key: 'study',    icon: '📖', label: 'Study' },
-            { key: 'diet',     icon: '🥗', label: 'Diet Dashboard' },
-          ].map(({ key, icon, label }) => (
+          {NAV_ITEMS.map(({ key, icon, label }) => (
             <button
               key={key}
               className={`home-nav-item${activeNav === key ? ' active' : ''}`}
