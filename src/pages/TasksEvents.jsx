@@ -1,15 +1,40 @@
-import { useState, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import '../styles/TasksEvents.css'
 
-/* ── helpers ───────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════
+   CONSTANTS & HELPERS
+   ════════════════════════════════════════════════════════════ */
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-const MONTHS_LONG  = ['January','February','March','April','May','June','July','August','September','October','November','December']
+const MONTHS_LONG  = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December']
 const DAYS_SHORT   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const DOW_LABELS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const CATEGORIES   = ['General','BSIT PARSERS','Math','Science','English','Filipino','PE','Others']
+
+function todayISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+}
+function pad(n) { return String(n).padStart(2,'0') }
+
+function addDays(iso, n) {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+}
 
 function formatDate(iso) {
   if (!iso) return ''
   const d = new Date(iso + 'T00:00:00')
   return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+}
+
+function formatTime(t) {
+  if (!t) return ''
+  const [h, m] = t.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const hour = h % 12 || 12
+  return `${hour}:${pad(m)} ${ampm}`
 }
 
 function daysUntil(iso) {
@@ -19,125 +44,89 @@ function daysUntil(iso) {
   return Math.ceil((due - now) / 86400000)
 }
 
-function badge(item) {
-  if (item.done) return { text: 'Done', cls: 'done-b' }
+function getBadge(item) {
   const d = daysUntil(item.due)
   if (d === null) return null
   if (d < 0)  return { text: `${Math.abs(d)}d late`, cls: 'overdue' }
+  if (d === 0) return { text: 'Today', cls: 'soon' }
   if (d <= 3) return { text: `in ${d}d`, cls: 'soon' }
   return { text: `in ${d}d`, cls: 'far' }
 }
 
-function groupByCategory(items) {
-  const map = {}
-  items.forEach(item => {
-    const cat = item.category || 'General'
-    if (!map[cat]) map[cat] = []
-    map[cat].push(item)
-  })
-  return map
+function groupBy(arr, fn) {
+  return arr.reduce((acc, item) => {
+    const key = fn(item)
+    ;(acc[key] = acc[key] || []).push(item)
+    return acc
+  }, {})
 }
 
-function nextDue(items) {
+function nextDueInGroup(items) {
   const pending = items.filter(i => !i.done && i.due).sort((a,b) => a.due.localeCompare(b.due))
   return pending[0]?.due || null
 }
 
-function todayISO() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-}
-
-function addDays(iso, n) {
-  const d = new Date(iso + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-}
-
-function groupByDate(items) {
-  const map = {}
-  items.forEach(item => {
-    const key = item.completedAt ? item.completedAt.split('T')[0] : 'Unknown'
-    if (!map[key]) map[key] = []
-    map[key].push(item)
-  })
-  return map
-}
-
-/* ── Storage helpers ───────────────────────────────────────── */
 function load(key, def) {
   try { return JSON.parse(localStorage.getItem(key)) ?? def } catch { return def }
 }
 function save(key, val) { localStorage.setItem(key, JSON.stringify(val)) }
 
-/* ══════════════════════════════════════════════════════════════
-   Calendar component
-   ══════════════════════════════════════════════════════════════ */
-function Calendar({ selected, onChange }) {
-  const today = new Date(); today.setHours(0,0,0,0)
-  const initDate = selected ? new Date(selected + 'T00:00:00') : today
-  const [view, setView] = useState({ year: initDate.getFullYear(), month: initDate.getMonth() })
+/* ════════════════════════════════════════════════════════════
+   CALENDAR
+   ════════════════════════════════════════════════════════════ */
+function Calendar({ selected, onChange, minDate }) {
+  const init = selected ? new Date(selected + 'T00:00:00') : new Date()
+  const [view, setView] = useState({ y: init.getFullYear(), m: init.getMonth() })
 
-  function prevMonth() {
-    setView(v => {
-      const m = v.month === 0 ? 11 : v.month - 1
-      const y = v.month === 0 ? v.year - 1 : v.year
-      return { year: y, month: m }
-    })
+  function prev() {
+    setView(v => v.m === 0 ? { y: v.y-1, m: 11 } : { y: v.y, m: v.m-1 })
   }
-  function nextMonth() {
-    setView(v => {
-      const m = v.month === 11 ? 0 : v.month + 1
-      const y = v.month === 11 ? v.year + 1 : v.year
-      return { year: y, month: m }
-    })
+  function next() {
+    setView(v => v.m === 11 ? { y: v.y+1, m: 0 } : { y: v.y, m: v.m+1 })
   }
 
-  // Build grid
-  const firstDay = new Date(view.year, view.month, 1).getDay()
-  const daysInMonth = new Date(view.year, view.month + 1, 0).getDate()
-  const daysInPrev  = new Date(view.year, view.month, 0).getDate()
+  const firstDay     = new Date(view.y, view.m, 1).getDay()
+  const daysInMonth  = new Date(view.y, view.m+1, 0).getDate()
+  const daysInPrev   = new Date(view.y, view.m, 0).getDate()
 
   const cells = []
-  for (let i = firstDay - 1; i >= 0; i--)
-    cells.push({ day: daysInPrev - i, thisMonth: false })
+  for (let i = firstDay-1; i >= 0; i--)
+    cells.push({ day: daysInPrev-i, cur: false })
   for (let d = 1; d <= daysInMonth; d++)
-    cells.push({ day: d, thisMonth: true })
+    cells.push({ day: d, cur: true })
   while (cells.length % 7 !== 0)
-    cells.push({ day: cells.length - firstDay - daysInMonth + 1, thisMonth: false })
+    cells.push({ day: cells.length - firstDay - daysInMonth + 1, cur: false })
 
-  function cellISO(cell) {
-    if (!cell.thisMonth) return null
-    return `${view.year}-${String(view.month+1).padStart(2,'0')}-${String(cell.day).padStart(2,'0')}`
+  function iso(cell) {
+    if (!cell.cur) return null
+    return `${view.y}-${pad(view.m+1)}-${pad(cell.day)}`
   }
 
   return (
     <div className="te-calendar">
       <div className="te-cal-header">
-        <button className="te-cal-nav" onClick={prevMonth}>‹</button>
-        <span className="te-cal-month">{MONTHS_LONG[view.month]} {view.year}</span>
-        <button className="te-cal-nav" onClick={nextMonth}>›</button>
+        <button type="button" className="te-cal-nav" onClick={prev}>‹</button>
+        <span className="te-cal-month">{MONTHS_LONG[view.m]} {view.y}</span>
+        <button type="button" className="te-cal-nav" onClick={next}>›</button>
       </div>
       <div className="te-cal-grid">
         {DAYS_SHORT.map(d => <div key={d} className="te-cal-dow">{d}</div>)}
         {cells.map((cell, i) => {
-          const iso = cellISO(cell)
-          const isToday = iso && iso === todayISO()
-          const isSel   = iso && iso === selected
+          const cellIso  = iso(cell)
+          const isToday  = cellIso === todayISO()
+          const isSel    = cellIso === selected
+          const tooEarly = minDate && cellIso && cellIso < minDate
           return (
             <button
-              key={i}
-              className={[
-                'te-cal-day',
-                !cell.thisMonth ? 'other-month' : '',
-                isToday ? 'today' : '',
-                isSel   ? 'selected' : '',
+              type="button" key={i}
+              className={['te-cal-day',
+                !cell.cur ? 'other-month' : '',
+                isToday   ? 'today'       : '',
+                isSel     ? 'selected'    : '',
               ].join(' ')}
-              onClick={() => iso && onChange(iso)}
-              disabled={!cell.thisMonth}
-            >
-              {cell.day}
-            </button>
+              onClick={() => cellIso && !tooEarly && onChange(cellIso)}
+              disabled={!cell.cur || tooEarly}
+            >{cell.day}</button>
           )
         })}
       </div>
@@ -145,328 +134,58 @@ function Calendar({ selected, onChange }) {
   )
 }
 
-/* ══════════════════════════════════════════════════════════════
-   Task Form Modal
-   ══════════════════════════════════════════════════════════════ */
-const CATEGORIES = ['General','BSIT PARSERS','Math','Science','English','Filipino','PE','Others']
+/* ════════════════════════════════════════════════════════════
+   SWIPEABLE CARD  (drag left/right)
+   ════════════════════════════════════════════════════════════ */
+function SwipeCard({ children, onDone, onCancel }) {
+  const ref   = useRef(null)
+  const start = useRef(null)
+  const [dx, setDx]       = useState(0)
+  const [action, setAction] = useState(null) // 'done' | 'cancel' | null
 
-function TaskFormModal({ onClose, onAdd }) {
-  const [name, setName]       = useState('')
-  const [due,  setDue]        = useState(addDays(todayISO(), 7))
-  const [remind, setRemind]   = useState(true)
-  const [category, setCat]    = useState('General')
-  const [quickSel, setQuick]  = useState('')
-
-  function applyQuick(label) {
-    setQuick(label)
-    if (label === 'Tomorrow')   setDue(addDays(todayISO(), 1))
-    if (label === 'In 3 days')  setDue(addDays(todayISO(), 3))
-    if (label === 'Next week')  setDue(addDays(todayISO(), 7))
+  function pointerDown(e) {
+    start.current = e.touches ? e.touches[0].clientX : e.clientX
+    setAction(null)
+  }
+  function pointerMove(e) {
+    if (start.current === null) return
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - start.current
+    setDx(x)
+    if (x >  60) setAction('done')
+    else if (x < -60) setAction('cancel')
+    else setAction(null)
+  }
+  function pointerUp() {
+    if (action === 'done')   { onDone();   }
+    else if (action === 'cancel') { onCancel(); }
+    setDx(0); setAction(null); start.current = null
   }
 
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (!name.trim()) return
-    onAdd({
-      id: Date.now(),
-      type: 'task',
-      name: name.trim(),
-      due,
-      category,
-      remind,
-      done: false,
-      createdAt: new Date().toISOString(),
-    })
+  const bg = action === 'done' ? '#d4edda' : action === 'cancel' ? '#f8d7da' : '#fff'
+  const style = {
+    transform: `translateX(${dx}px)`,
+    background: bg,
+    transition: start.current ? 'none' : 'transform 0.2s, background 0.2s',
   }
 
   return (
-    <div className="te-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="te-modal">
-        <p className="te-form-title">NEW TASK</p>
-        <h2 className="te-form-heading">NEW TASK</h2>
-        <form onSubmit={handleSubmit}>
-          <input
-            className="te-name-input"
-            placeholder="e.g., Change assignment"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            autoFocus
-          />
-
-          {/* Date row */}
-          <div className="te-row-btn" style={{ marginBottom: 6 }}>
-            <span className="te-row-btn-icon">📅</span>
-            <div className="te-row-btn-body">
-              <div className="te-row-btn-label">{formatDate(due) || 'Pick a date'}</div>
-            </div>
-            <input
-              type="date"
-              value={due}
-              min={todayISO()}
-              onChange={e => { setDue(e.target.value); setQuick('') }}
-              style={{ position:'absolute', opacity:0, width:'100%', inset:0, cursor:'pointer', zIndex:2 }}
-            />
-            <span className="te-row-btn-arrow">›</span>
-          </div>
-
-          <div className="te-quick-dates">
-            {['Tomorrow','In 3 days','Next week'].map(q => (
-              <button
-                key={q} type="button"
-                className={`te-quick-chip${quickSel === q ? ' active' : ''}`}
-                onClick={() => applyQuick(q)}
-              >{q}</button>
-            ))}
-          </div>
-
-          {/* Remind me */}
-          <div className="te-row-btn">
-            <span className="te-row-btn-icon">🔔</span>
-            <div className="te-row-btn-body">
-              <div className="te-row-btn-label">Remind me</div>
-              <div className="te-row-btn-sub">Default to 7:00 AM</div>
-            </div>
-            <span className="te-row-btn-arrow">›</span>
-          </div>
-
-          {/* Remind before due toggle */}
-          <div className="te-toggle-row">
-            <span className="te-toggle-icon">🌿</span>
-            <div className="te-toggle-body">
-              <div className="te-toggle-label">Remind me before due</div>
-              <div className="te-toggle-sub">{remind ? 'On' : 'Off'}</div>
-            </div>
-            <label className="te-toggle">
-              <input type="checkbox" checked={remind} onChange={e => setRemind(e.target.checked)} />
-              <span className="te-toggle-track" />
-            </label>
-          </div>
-
-          {/* Category */}
-          <div className="te-category-row">
-            <div className="te-category-cb" />
-            <span className="te-category-label">Category:</span>
-            <select className="te-category-select" value={category} onChange={e => setCat(e.target.value)}>
-              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-            </select>
-            <span style={{ color:'#c0d4e8', fontSize:14 }}>›</span>
-          </div>
-
-          <div className="te-form-actions">
-            <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="submit" className="te-btn-submit">Add Task</button>
-          </div>
-        </form>
-      </div>
+    <div
+      ref={ref}
+      style={style}
+      onMouseDown={pointerDown} onMouseMove={pointerMove} onMouseUp={pointerUp} onMouseLeave={pointerUp}
+      onTouchStart={pointerDown} onTouchMove={pointerMove} onTouchEnd={pointerUp}
+    >
+      {children}
     </div>
   )
 }
 
-/* ══════════════════════════════════════════════════════════════
-   Event Form Modal  (with calendar)
-   ══════════════════════════════════════════════════════════════ */
-function EventFormModal({ onClose, onAdd }) {
-  const [name, setName]       = useState('')
-  const [startDate, setStart] = useState(todayISO())
-  const [duration, setDur]    = useState(5)
-  const [category, setCat]    = useState('General')
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (!name.trim()) return
-    onAdd({
-      id: Date.now(),
-      type: 'event',
-      name: name.trim(),
-      due: addDays(startDate, duration - 1),
-      startDate,
-      duration,
-      category,
-      done: false,
-      createdAt: new Date().toISOString(),
-    })
-  }
-
-  return (
-    <div className="te-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="te-modal">
-        <p className="te-form-title">NEW EVENT</p>
-        <form onSubmit={handleSubmit}>
-          <input
-            className="te-name-input"
-            placeholder="e.g., CyberDays"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            autoFocus
-          />
-
-          {/* Duration */}
-          <div className="te-duration-row">
-            <div>
-              <div className="te-duration-label">How many days?</div>
-              <div className="te-duration-sub">{formatDate(startDate)}</div>
-            </div>
-            <div className="te-duration-ctrl">
-              <button type="button" className="te-duration-btn"
-                onClick={() => setDur(d => Math.max(1, d-1))}>−</button>
-              <span className="te-duration-num">{duration}</span>
-              <button type="button" className="te-duration-btn"
-                onClick={() => setDur(d => d+1)}>+</button>
-            </div>
-          </div>
-
-          <p style={{ fontSize:12, color:'#8fa0b0', margin:'0 0 8px' }}>Tap a day to set when it starts</p>
-
-          <Calendar selected={startDate} onChange={setStart} />
-
-          {/* Category */}
-          <div className="te-category-row">
-            <div className="te-category-cb" />
-            <span className="te-category-label">Category:</span>
-            <select className="te-category-select" value={category} onChange={e => setCat(e.target.value)}>
-              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-            </select>
-            <span style={{ color:'#c0d4e8', fontSize:14 }}>›</span>
-          </div>
-
-          <div className="te-form-actions">
-            <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="submit" className="te-btn-submit">Add Event</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-/* ══════════════════════════════════════════════════════════════
-   Repeating Reminder Modal
-   ══════════════════════════════════════════════════════════════ */
-const DOW = ['S','M','T','W','T','F','S']
-
-function RepeatFormModal({ onClose, onAdd }) {
-  const [name, setName]     = useState('')
-  const [days, setDays]     = useState([])  // 0=Sun … 6=Sat
-  const [time, setTime]     = useState('08:00')
-
-  function toggleDay(i) {
-    setDays(d => d.includes(i) ? d.filter(x => x !== i) : [...d, i])
-  }
-
-  function applyPreset(preset) {
-    if (preset === 'Weekdays') setDays([1,2,3,4,5])
-    if (preset === 'Weekends') setDays([0,6])
-    if (preset === 'Every day') setDays([0,1,2,3,4,5,6])
-  }
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (!name.trim()) return
-    onAdd({
-      id: Date.now(),
-      name: name.trim(),
-      days,
-      time,
-      createdAt: new Date().toISOString(),
-    })
-  }
-
-  return (
-    <div className="te-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="te-modal">
-        <p className="te-form-title">NEW REPEATING REMINDER</p>
-        <form onSubmit={handleSubmit}>
-          <input
-            className="te-name-input"
-            placeholder="e.g., Wash clothes"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            autoFocus
-          />
-
-          <p style={{ fontSize:12, fontWeight:600, color:'#42566a', margin:'0 0 8px' }}>Repeat on</p>
-
-          <div className="te-preset-row">
-            {['Weekdays','Weekends','Every day'].map(p => (
-              <button key={p} type="button" className="te-preset-chip" onClick={() => applyPreset(p)}>{p}</button>
-            ))}
-          </div>
-
-          <div className="te-days-row">
-            {DOW.map((d,i) => (
-              <button
-                key={i} type="button"
-                className={`te-day-chip${days.includes(i) ? ' active' : ''}`}
-                onClick={() => toggleDay(i)}
-              >{d}</button>
-            ))}
-          </div>
-
-          {/* Time */}
-          <div className="te-time-row">
-            <span className="te-time-icon">🔔</span>
-            <div className="te-time-label">
-              <strong>Time</strong>
-              <span>When should this fire?</span>
-            </div>
-            <input
-              type="time"
-              className="te-time-input"
-              value={time}
-              onChange={e => setTime(e.target.value)}
-            />
-            <span style={{ color:'#c0d4e8', fontSize:14 }}>›</span>
-          </div>
-
-          <div className="te-form-actions">
-            <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="submit" className="te-btn-submit">Add Reminder</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-/* ══════════════════════════════════════════════════════════════
-   Checklist Item Modal
-   ══════════════════════════════════════════════════════════════ */
-function ChecklistModal({ onClose, onAdd }) {
-  const [name, setName] = useState('')
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (!name.trim()) return
-    onAdd({ id: Date.now(), name: name.trim(), done: false })
-  }
-  return (
-    <div className="te-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="te-modal">
-        <p className="te-form-title">NEW CHECKLIST ITEM</p>
-        <p style={{ fontSize:12, color:'#8fa0b0', margin:'0 0 14px' }}>Something quick you don't want to forget</p>
-        <form onSubmit={handleSubmit}>
-          <input
-            className="te-name-input"
-            placeholder="e.g., Bring project materials"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            autoFocus
-          />
-          <div className="te-form-actions">
-            <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="submit" className="te-btn-submit" style={{ background:'#f5a623' }}>Add Item</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-/* ══════════════════════════════════════════════════════════════
-   Choose Type Sheet
-   ══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════
+   CHOOSE TYPE SHEET
+   ════════════════════════════════════════════════════════════ */
 function ChooseTypeSheet({ onClose, onChoose }) {
   return (
-    <div className="te-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="te-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
       <div className="te-modal">
         <p className="te-choose-title">WHAT DO YOU WANT TO ADD?</p>
         <button className="te-choose-option" onClick={() => onChoose('task')}>
@@ -491,73 +210,703 @@ function ChooseTypeSheet({ onClose, onChoose }) {
   )
 }
 
-/* ══════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════
+   TASK FORM MODAL
+   ════════════════════════════════════════════════════════════ */
+function TaskFormModal({ onClose, onAdd, editItem }) {
+  const [name,       setName]    = useState(editItem?.name       || '')
+  const [due,        setDue]     = useState(editItem?.due        || addDays(todayISO(), 7))
+  const [remindTime, setRTime]   = useState(editItem?.remindTime || '07:00')
+  const [remindBefore, setRB]    = useState(editItem?.remindBefore ?? true)
+  const [category,   setCat]     = useState(editItem?.category   || 'General')
+  const [quickSel,   setQuick]   = useState('')
+  const [showCal,    setShowCal] = useState(false)
+  const [nameErr,    setNameErr] = useState(false)
+
+  function applyQuick(label) {
+    setQuick(label)
+    setShowCal(false)
+    if (label === 'Tomorrow')  setDue(addDays(todayISO(), 1))
+    if (label === 'In 3 days') setDue(addDays(todayISO(), 3))
+    if (label === 'Next week') setDue(addDays(todayISO(), 7))
+  }
+
+  function submit(e) {
+    e.preventDefault()
+    if (!name.trim()) { setNameErr(true); return }
+    onAdd({
+      id: editItem?.id || Date.now(),
+      type: 'task',
+      name: name.trim(),
+      due,
+      remindTime,
+      remindBefore,
+      category,
+      done: editItem?.done ?? false,
+      completedAt: editItem?.completedAt,
+      createdAt: editItem?.createdAt || new Date().toISOString(),
+    })
+  }
+
+  return (
+    <div className="te-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="te-modal te-modal-scroll">
+        <p className="te-form-title">{editItem ? 'EDIT TASK' : 'NEW TASK'}</p>
+        <h2 className="te-form-heading">{editItem ? 'EDIT TASK' : 'NEW TASK'}</h2>
+        <form onSubmit={submit}>
+
+          {/* Name */}
+          <input
+            className={`te-name-input${nameErr?' error':''}`}
+            placeholder="e.g., Change assignment"
+            value={name}
+            onChange={e => { setName(e.target.value); setNameErr(false) }}
+            autoFocus
+          />
+          {nameErr && <p style={{color:'#d9534f',fontSize:11,margin:'-10px 0 10px'}}>Task name is required.</p>}
+
+          {/* Date row — clicking opens inline calendar */}
+          <button
+            type="button" className="te-row-btn"
+            style={{ marginBottom: 6, position:'relative' }}
+            onClick={() => setShowCal(c => !c)}
+          >
+            <span className="te-row-btn-icon">📅</span>
+            <div className="te-row-btn-body">
+              <div className="te-row-btn-label">{formatDate(due) || 'Pick a date'}</div>
+              <div className="te-row-btn-sub">Tap to change</div>
+            </div>
+            <span className="te-row-btn-arrow">{showCal ? '∧' : '›'}</span>
+          </button>
+
+          {showCal && (
+            <Calendar
+              selected={due}
+              minDate={todayISO()}
+              onChange={d => { setDue(d); setShowCal(false); setQuick('') }}
+            />
+          )}
+
+          <div className="te-quick-dates">
+            {['Tomorrow','In 3 days','Next week'].map(q => (
+              <button
+                key={q} type="button"
+                className={`te-quick-chip${quickSel===q?' active':''}`}
+                onClick={() => applyQuick(q)}
+              >{q}</button>
+            ))}
+          </div>
+
+          {/* Remind me — time picker */}
+          <div className="te-row-btn" style={{ cursor:'default' }}>
+            <span className="te-row-btn-icon">🔔</span>
+            <div className="te-row-btn-body">
+              <div className="te-row-btn-label">Remind me</div>
+              <div className="te-row-btn-sub">{formatTime(remindTime)}</div>
+            </div>
+            <input
+              type="time" value={remindTime}
+              onChange={e => setRTime(e.target.value)}
+              className="te-time-input"
+              style={{ marginLeft:'auto' }}
+            />
+          </div>
+
+          {/* Remind before due toggle */}
+          <div className="te-toggle-row">
+            <span className="te-toggle-icon">🌿</span>
+            <div className="te-toggle-body">
+              <div className="te-toggle-label">Remind me before due</div>
+              <div className="te-toggle-sub">{remindBefore ? 'On — 1 day before due date' : 'Off'}</div>
+            </div>
+            <label className="te-toggle">
+              <input type="checkbox" checked={remindBefore} onChange={e => setRB(e.target.checked)} />
+              <span className="te-toggle-track" />
+            </label>
+          </div>
+
+          {/* Category */}
+          <div className="te-category-row">
+            <div className="te-category-cb" />
+            <span className="te-category-label">Category:</span>
+            <select className="te-category-select" value={category} onChange={e => setCat(e.target.value)}>
+              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+            </select>
+            <span style={{ color:'#c0d4e8', fontSize:14 }}>›</span>
+          </div>
+
+          <div className="te-form-actions">
+            <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="submit" className="te-btn-submit">
+              {editItem ? 'Save Changes' : 'Add Task'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
+   EVENT FORM MODAL
+   ════════════════════════════════════════════════════════════ */
+function EventFormModal({ onClose, onAdd, editItem }) {
+  const [name,     setName]  = useState(editItem?.name      || '')
+  const [start,    setStart] = useState(editItem?.startDate || todayISO())
+  const [duration, setDur]   = useState(editItem?.duration  || 5)
+  const [category, setCat]   = useState(editItem?.category  || 'General')
+  const [nameErr,  setNErr]  = useState(false)
+
+  function submit(e) {
+    e.preventDefault()
+    if (!name.trim()) { setNErr(true); return }
+    onAdd({
+      id: editItem?.id || Date.now(),
+      type: 'event',
+      name: name.trim(),
+      due: addDays(start, duration - 1),
+      startDate: start,
+      duration,
+      category,
+      done: editItem?.done ?? false,
+      completedAt: editItem?.completedAt,
+      createdAt: editItem?.createdAt || new Date().toISOString(),
+    })
+  }
+
+  return (
+    <div className="te-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="te-modal te-modal-scroll">
+        <p className="te-form-title">{editItem ? 'EDIT EVENT' : 'NEW EVENT'}</p>
+        <form onSubmit={submit}>
+          <input
+            className={`te-name-input${nameErr?' error':''}`}
+            placeholder="e.g., CyberDays"
+            value={name}
+            onChange={e => { setName(e.target.value); setNErr(false) }}
+            autoFocus
+          />
+          {nameErr && <p style={{color:'#d9534f',fontSize:11,margin:'-10px 0 10px'}}>Event name is required.</p>}
+
+          {/* Duration stepper */}
+          <div className="te-duration-row">
+            <div>
+              <div className="te-duration-label">How many days?</div>
+              <div className="te-duration-sub">
+                {formatDate(start)} → {formatDate(addDays(start, duration - 1))}
+              </div>
+            </div>
+            <div className="te-duration-ctrl">
+              <button type="button" className="te-duration-btn"
+                onClick={() => setDur(d => Math.max(1, d-1))}>−</button>
+              <span className="te-duration-num">{duration}</span>
+              <button type="button" className="te-duration-btn"
+                onClick={() => setDur(d => d+1)}>+</button>
+            </div>
+          </div>
+
+          <p style={{ fontSize:12, color:'#8fa0b0', margin:'0 0 6px' }}>
+            Tap a day to set when the event starts
+          </p>
+          <Calendar selected={start} onChange={setStart} />
+
+          {/* Category */}
+          <div className="te-category-row">
+            <div className="te-category-cb" />
+            <span className="te-category-label">Category:</span>
+            <select className="te-category-select" value={category} onChange={e => setCat(e.target.value)}>
+              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+            </select>
+            <span style={{ color:'#c0d4e8', fontSize:14 }}>›</span>
+          </div>
+
+          <div className="te-form-actions">
+            <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="submit" className="te-btn-submit">
+              {editItem ? 'Save Changes' : 'Add Event'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
+   REPEAT FORM MODAL
+   ════════════════════════════════════════════════════════════ */
+function RepeatFormModal({ onClose, onAdd, editItem }) {
+  const [name,  setName] = useState(editItem?.name  || '')
+  const [days,  setDays] = useState(editItem?.days  || [])
+  const [time,  setTime] = useState(editItem?.time  || '08:00')
+  const [nameErr, setNE] = useState(false)
+
+  function toggleDay(i) {
+    setDays(d => d.includes(i) ? d.filter(x => x!==i) : [...d, i].sort((a,b)=>a-b))
+  }
+  function preset(p) {
+    if (p === 'Weekdays')  setDays([1,2,3,4,5])
+    if (p === 'Weekends')  setDays([0,6])
+    if (p === 'Every day') setDays([0,1,2,3,4,5,6])
+  }
+
+  function submit(e) {
+    e.preventDefault()
+    if (!name.trim()) { setNE(true); return }
+    onAdd({
+      id: editItem?.id || Date.now(),
+      name: name.trim(),
+      days,
+      time,
+      createdAt: editItem?.createdAt || new Date().toISOString(),
+    })
+  }
+
+  // next fire date
+  function nextFire() {
+    if (!days.length) return null
+    const today = new Date(); today.setHours(0,0,0,0)
+    const todayDow = today.getDay()
+    const [h, m] = time.split(':').map(Number)
+    const now = new Date()
+    // find soonest matching day
+    for (let offset = 0; offset <= 7; offset++) {
+      const candidate = new Date(today); candidate.setDate(today.getDate() + offset)
+      const dow = candidate.getDay()
+      if (!days.includes(dow)) continue
+      // same day: check if time hasn't passed
+      if (offset === 0) {
+        const fireTime = new Date(today); fireTime.setHours(h, m, 0, 0)
+        if (now >= fireTime) continue
+      }
+      return `${MONTHS_SHORT[candidate.getMonth()]} ${candidate.getDate()} at ${formatTime(time)}`
+    }
+    return null
+  }
+  const nf = nextFire()
+
+  return (
+    <div className="te-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="te-modal te-modal-scroll">
+        <p className="te-form-title">
+          {editItem ? 'EDIT REPEATING REMINDER' : 'NEW REPEATING REMINDER'}
+        </p>
+        <form onSubmit={submit}>
+          <input
+            className={`te-name-input${nameErr?' error':''}`}
+            placeholder="e.g., Wash clothes"
+            value={name}
+            onChange={e => { setName(e.target.value); setNE(false) }}
+            autoFocus
+          />
+          {nameErr && <p style={{color:'#d9534f',fontSize:11,margin:'-10px 0 10px'}}>Name is required.</p>}
+
+          <p style={{ fontSize:12, fontWeight:600, color:'#42566a', margin:'0 0 8px' }}>Repeat on</p>
+
+          <div className="te-preset-row">
+            {['Weekdays','Weekends','Every day'].map(p => (
+              <button
+                key={p} type="button"
+                className={`te-preset-chip${
+                  (p==='Weekdays' && JSON.stringify(days)===JSON.stringify([1,2,3,4,5])) ||
+                  (p==='Weekends' && JSON.stringify(days)===JSON.stringify([0,6])) ||
+                  (p==='Every day' && days.length===7) ? ' active' : ''
+                }`}
+                onClick={() => preset(p)}
+              >{p}</button>
+            ))}
+          </div>
+
+          <div className="te-days-row">
+            {['S','M','T','W','T','F','S'].map((d,i) => (
+              <button
+                key={i} type="button"
+                className={`te-day-chip${days.includes(i)?' active':''}`}
+                onClick={() => toggleDay(i)}
+                title={DOW_LABELS[i]}
+              >{d}</button>
+            ))}
+          </div>
+
+          {/* Time */}
+          <div className="te-time-row">
+            <span className="te-time-icon">🔔</span>
+            <div className="te-time-label">
+              <strong>Time</strong>
+              <span>When this reminder fires</span>
+            </div>
+            <input
+              type="time" className="te-time-input"
+              value={time} onChange={e => setTime(e.target.value)}
+            />
+          </div>
+
+          {nf && (
+            <div className="te-next-fire">
+              <span>⏭</span> Next fire: <strong>{nf}</strong>
+            </div>
+          )}
+
+          <div className="te-form-actions">
+            <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="submit" className="te-btn-submit">
+              {editItem ? 'Save Changes' : 'Add Reminder'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
+   CHECKLIST ITEM MODAL
+   ════════════════════════════════════════════════════════════ */
+function ChecklistModal({ onClose, onAdd }) {
+  const [name, setName] = useState('')
+  const [err,  setErr]  = useState(false)
+
+  function submit(e) {
+    e.preventDefault()
+    if (!name.trim()) { setErr(true); return }
+    onAdd({ id: Date.now(), name: name.trim(), done: false, createdAt: new Date().toISOString() })
+  }
+
+  return (
+    <div className="te-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="te-modal">
+        <p className="te-form-title">NEW CHECKLIST ITEM</p>
+        <p style={{ fontSize:12, color:'#8fa0b0', margin:'0 0 14px' }}>
+          Something quick you don't want to forget
+        </p>
+        <form onSubmit={submit}>
+          <input
+            className={`te-name-input${err?' error':''}`}
+            placeholder="e.g., Bring project materials"
+            value={name}
+            onChange={e => { setName(e.target.value); setErr(false) }}
+            autoFocus
+          />
+          {err && <p style={{color:'#d9534f',fontSize:11,margin:'-10px 0 10px'}}>Item text is required.</p>}
+          <div className="te-form-actions">
+            <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="submit" className="te-btn-submit" style={{ background:'#f5a623' }}>
+              Add Item
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
+   ITEM DETAIL MODAL  (tap a card to view/edit/delete)
+   ════════════════════════════════════════════════════════════ */
+function ItemDetailModal({ item, onClose, onEdit, onDelete, onToggle }) {
+  const b = getBadge(item)
+  return (
+    <div className="te-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="te-modal">
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:16 }}>
+          <div>
+            <p style={{ fontSize:11, color:'#8fa0b0', margin:'0 0 4px', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+              {item.type === 'event' ? 'Event' : 'Task'} · {item.category || 'General'}
+            </p>
+            <h3 style={{ fontSize:18, fontWeight:700, color:'#1d3547', margin:0 }}>{item.name}</h3>
+          </div>
+          {b && <span className={`te-item-badge ${b.cls}`}>{b.text}</span>}
+        </div>
+
+        <div className="te-detail-rows">
+          <div className="te-detail-row">
+            <span>📅</span>
+            <div>
+              <strong>Due date</strong>
+              <span>{item.due ? formatDate(item.due) : 'No due date'}</span>
+            </div>
+          </div>
+          {item.type === 'event' && item.startDate && (
+            <div className="te-detail-row">
+              <span>📆</span>
+              <div>
+                <strong>Event span</strong>
+                <span>
+                  {formatDate(item.startDate)} → {formatDate(item.due)}
+                  &nbsp;({item.duration} day{item.duration!==1?'s':''})
+                </span>
+              </div>
+            </div>
+          )}
+          {item.remindTime && (
+            <div className="te-detail-row">
+              <span>🔔</span>
+              <div>
+                <strong>Reminder</strong>
+                <span>{formatTime(item.remindTime)}{item.remindBefore ? ' · also 1 day before' : ''}</span>
+              </div>
+            </div>
+          )}
+          <div className="te-detail-row">
+            <span>📊</span>
+            <div>
+              <strong>Status</strong>
+              <span>{item.done ? `Completed on ${new Date(item.completedAt).toLocaleDateString()}` : 'Pending'}</span>
+            </div>
+          </div>
+          <div className="te-detail-row">
+            <span>🕐</span>
+            <div>
+              <strong>Created</strong>
+              <span>{new Date(item.createdAt).toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'})}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="te-form-actions" style={{ marginTop:20 }}>
+          <button type="button" className="te-btn-cancel" onClick={onClose}>Close</button>
+          <button
+            type="button" className="te-btn-submit"
+            style={{ background: item.done ? '#6c757d' : '#087bc4' }}
+            onClick={() => { onToggle(item.id); onClose() }}
+          >
+            {item.done ? '↩ Mark Pending' : '✓ Mark Done'}
+          </button>
+          <button
+            type="button" className="te-btn-submit"
+            style={{ background:'#f5a623' }}
+            onClick={() => { onEdit(item); onClose() }}
+          >✎ Edit</button>
+          <button
+            type="button" className="te-btn-submit"
+            style={{ background:'#d9534f' }}
+            onClick={() => { onDelete(item.id); onClose() }}
+          >🗑 Delete</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
+   CONFIRM MODAL  (generic)
+   ════════════════════════════════════════════════════════════ */
+function ConfirmModal({ title, message, confirmLabel, confirmColor, onConfirm, onClose }) {
+  return (
+    <div className="te-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
+      <div className="te-modal" style={{ maxWidth:380 }}>
+        <h3 style={{ fontSize:17, fontWeight:700, color:'#1d3547', margin:'0 0 10px' }}>{title}</h3>
+        <p style={{ fontSize:13, color:'#6b7f90', margin:'0 0 20px' }}>{message}</p>
+        <div className="te-form-actions">
+          <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
+          <button
+            type="button" className="te-btn-submit"
+            style={{ background: confirmColor || '#d9534f' }}
+            onClick={() => { onConfirm(); onClose() }}
+          >{confirmLabel || 'Confirm'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
+   NOTIFICATION TOAST
+   ════════════════════════════════════════════════════════════ */
+function Toast({ msg, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 3000)
+    return () => clearTimeout(t)
+  }, [onDone])
+  return (
+    <div className="te-toast">
+      <span>✅</span> {msg}
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
    MAIN PAGE
-   ══════════════════════════════════════════════════════════════ */
+   ════════════════════════════════════════════════════════════ */
 export default function TasksEvents() {
   const [tab, setTab] = useState('pending')
 
-  /* ── Pending items (tasks + events) ───────────────────── */
+  /* ── items ─────────────────────────────────────────────── */
   const [items, setItems] = useState(() => load('te_items', []))
   function saveItems(next) { setItems(next); save('te_items', next) }
 
   function addItem(item) {
-    saveItems([...items, item])
+    // edit vs add
+    setItems(prev => {
+      const idx = prev.findIndex(i => i.id === item.id)
+      const next = idx >= 0
+        ? prev.map(i => i.id === item.id ? item : i)
+        : [...prev, item]
+      save('te_items', next)
+      return next
+    })
     setModal(null)
+    showToast(item.id ? 'Task saved!' : 'Task added!')
   }
-  function toggleItem(id) {
-    saveItems(items.map(i =>
-      i.id === id
-        ? { ...i, done: !i.done, completedAt: !i.done ? new Date().toISOString() : undefined }
-        : i
-    ))
-  }
-  function deleteItem(id) { saveItems(items.filter(i => i.id !== id)) }
 
-  /* ── Repeating reminders ───────────────────────────────── */
+  function toggleItem(id) {
+    setItems(prev => {
+      const next = prev.map(i =>
+        i.id === id
+          ? { ...i, done: !i.done, completedAt: !i.done ? new Date().toISOString() : undefined }
+          : i
+      )
+      save('te_items', next)
+      return next
+    })
+  }
+
+  function deleteItem(id) {
+    setItems(prev => { const n = prev.filter(i => i.id!==id); save('te_items',n); return n })
+  }
+
+  function restoreItem(id) {
+    setItems(prev => {
+      const n = prev.map(i => i.id===id ? {...i, done:false, completedAt:undefined} : i)
+      save('te_items', n); return n
+    })
+    showToast('Task restored to Pending.')
+  }
+
+  function clearHistory() {
+    setItems(prev => { const n = prev.filter(i => !i.done); save('te_items',n); return n })
+    showToast('History cleared.')
+  }
+
+  /* ── repeats ───────────────────────────────────────────── */
   const [repeats, setRepeats] = useState(() => load('te_repeats', []))
   function saveRepeats(next) { setRepeats(next); save('te_repeats', next) }
-  function addRepeat(r) { saveRepeats([...repeats, r]); setModal(null) }
-  function deleteRepeat(id) { saveRepeats(repeats.filter(r => r.id !== id)) }
 
-  /* ── Checklist ─────────────────────────────────────────── */
-  const [clItems, setClItems] = useState(() => load('te_checklist', []))
-  function saveClItems(next) { setClItems(next); save('te_checklist', next) }
-  function addClItem(item) { saveClItems([...clItems, item]); setModal(null) }
-  function toggleCl(id) { saveClItems(clItems.map(i => i.id===id ? {...i,done:!i.done} : i)) }
-  function deleteCl(id) { saveClItems(clItems.filter(i => i.id!==id)) }
-
-  /* ── Modals ────────────────────────────────────────────── */
-  // null | 'choose' | 'task' | 'event' | 'repeat' | 'checklist'
-  const [modal, setModal] = useState(null)
-
-  function fabClick() {
-    if (tab === 'pending')   setModal('choose')
-    if (tab === 'repeats')   setModal('repeat')
-    if (tab === 'checklist') setModal('checklist')
-    // history tab FAB does nothing
+  function addRepeat(r) {
+    setRepeats(prev => {
+      const idx = prev.findIndex(x => x.id === r.id)
+      const next = idx >= 0 ? prev.map(x => x.id===r.id ? r : x) : [...prev, r]
+      save('te_repeats', next); return next
+    })
+    setModal(null)
+    showToast('Reminder saved!')
+  }
+  function deleteRepeat(id) {
+    setRepeats(prev => { const n = prev.filter(r => r.id!==id); save('te_repeats',n); return n })
   }
 
-  /* ── Derived data ──────────────────────────────────────── */
-  const pending  = items.filter(i => !i.done)
-  const history  = items.filter(i =>  i.done)
-  const groups   = groupByCategory(pending)
-  const histGroups = groupByDate(history)
+  /* ── checklist ─────────────────────────────────────────── */
+  const [clItems, setClItems] = useState(() => load('te_checklist', []))
+  function saveClItems(next) { setClItems(next); save('te_checklist', next) }
 
-  /* ── Tab counts ────────────────────────────────────────── */
+  function addClItem(item) {
+    setClItems(prev => { const n = [...prev, item]; save('te_checklist',n); return n })
+    setModal(null)
+    showToast('Item added!')
+  }
+  function toggleCl(id) {
+    setClItems(prev => {
+      const n = prev.map(i => i.id===id ? {...i,done:!i.done} : i)
+      save('te_checklist',n); return n
+    })
+  }
+  function deleteCl(id) {
+    setClItems(prev => { const n = prev.filter(i => i.id!==id); save('te_checklist',n); return n })
+  }
+  function clearChecklist() {
+    setClItems([]); save('te_checklist',[])
+    showToast('Checklist cleared.')
+  }
+  function clearDoneChecklist() {
+    setClItems(prev => { const n = prev.filter(i => !i.done); save('te_checklist',n); return n })
+    showToast('Completed items removed.')
+  }
+
+  /* ── modals ────────────────────────────────────────────── */
+  // null | 'choose' | 'task' | 'event' | 'repeat' | 'checklist'
+  //      | { type:'detail', item } | { type:'edit-task', item }
+  //      | { type:'edit-event', item } | { type:'edit-repeat', item }
+  //      | { type:'confirm', ... }
+  const [modal, setModal]     = useState(null)
+  const [editTarget, setEdit] = useState(null)
+
+  function openEdit(item) {
+    setEdit(item)
+    setModal(item.type === 'event' ? 'event' : 'task')
+  }
+  function openEditRepeat(r) {
+    setEdit(r)
+    setModal('repeat')
+  }
+
+  function fabClick() {
+    if (tab === 'pending')   { setEdit(null); setModal('choose') }
+    if (tab === 'repeats')   { setEdit(null); setModal('repeat') }
+    if (tab === 'checklist') { setModal('checklist') }
+    if (tab === 'history')   {
+      setModal({ type:'confirm',
+        title:'Clear all history',
+        message:'This will permanently remove all completed tasks.',
+        confirmLabel:'Clear History',
+        onConfirm: clearHistory,
+      })
+    }
+  }
+
+  /* ── toast ─────────────────────────────────────────────── */
+  const [toast, setToast] = useState(null)
+  function showToast(msg) { setToast(msg) }
+
+  /* ── derived ───────────────────────────────────────────── */
+  const pending  = items.filter(i => !i.done)
+  const history  = items.filter(i =>  i.done).sort((a,b) => (b.completedAt||'').localeCompare(a.completedAt||''))
+  const groups   = groupBy(pending, i => i.category || 'General')
+  const histGrps = groupBy(history, i => i.completedAt?.split('T')[0] || 'Unknown')
+
   const TAB_DATA = {
-    pending:   { label: 'Pending',   icon: '', count: pending.length,   sub: `${items.filter(i=>i.done).length} task completed` },
-    repeats:   { label: 'Repeats',   icon: '↻ ', count: repeats.length, sub: `${repeats.length} repeating reminders` },
-    history:   { label: 'History',   icon: '◷ ', count: history.length, sub: `${history.length} task completed` },
-    checklist: { label: 'Checklist', icon: '☰ ', count: clItems.length, sub: `${clItems.length} items` },
+    pending:   { label:'Pending',   icon:'',   count: pending.length,  sub: `${history.length} completed` },
+    repeats:   { label:'Repeats',   icon:'↻ ', count: repeats.length,  sub: `${repeats.length} repeating reminders` },
+    history:   { label:'History',   icon:'◷ ', count: history.length,  sub: `${history.length} task completed` },
+    checklist: { label:'Checklist', icon:'☰ ', count: clItems.length,  sub: `${clItems.filter(i=>i.done).length}/${clItems.length} done` },
   }
   const cur = TAB_DATA[tab]
 
-  /* ── render ────────────────────────────────────────────── */
+  /* ── reminder check on mount ──────────────────────────── */
+  useEffect(() => {
+    const now = new Date()
+    const todayStr = todayISO()
+    const tomorrowStr = addDays(todayStr, 1)
+    const alerts = []
+    items.filter(i => !i.done).forEach(item => {
+      if (item.remindBefore && item.due === tomorrowStr)
+        alerts.push(`"${item.name}" is due tomorrow!`)
+      if (item.due === todayStr)
+        alerts.push(`"${item.name}" is due today!`)
+    })
+    if (alerts.length) {
+      setTimeout(() => showToast(`⚠ ${alerts[0]}${alerts.length>1?` (+${alerts.length-1} more)`:''}`), 800)
+    }
+    // repeating reminders
+    const h = now.getHours(), m = now.getMinutes()
+    const curTime = `${pad(h)}:${pad(m)}`
+    const todayDow = now.getDay()
+    repeats.forEach(r => {
+      if (r.days.includes(todayDow)) {
+        const [rh, rm] = r.time.split(':').map(Number)
+        const diff = (rh*60+rm) - (h*60+m)
+        if (diff >= 0 && diff <= 2)
+          setTimeout(() => showToast(`🔔 Reminder: ${r.name}`), diff * 60000)
+      }
+    })
+  }, []) // eslint-disable-line
+
+  /* ════════════════════════════════════════════════════════
+     RENDER
+     ════════════════════════════════════════════════════════ */
   return (
     <div className="te-page">
 
-      {/* Hero */}
+      {/* ── Hero ──────────────────────────────────────────── */}
       <div className="te-hero">
         <div className="te-hero-top">
           <div className="te-hero-title">
@@ -565,9 +914,17 @@ export default function TasksEvents() {
             <p>Stay on track, achieve more. ✨</p>
           </div>
           <div className="te-hero-actions">
-            <button className="te-hero-btn" title="Sync">↻</button>
-            <button className="te-hero-btn" title="Gallery">🖼</button>
-            <button className="te-hero-btn" title="Settings">⚙️</button>
+            <button className="te-hero-btn" title="Sync data" onClick={() => showToast('Data synced!')}>↻</button>
+            <button className="te-hero-btn" title="Export" onClick={() => {
+              const data = JSON.stringify({ items, repeats, clItems }, null, 2)
+              const blob = new Blob([data], { type:'application/json' })
+              const url  = URL.createObjectURL(blob)
+              const a    = document.createElement('a')
+              a.href = url; a.download = 'eskwela-tasks.json'; a.click()
+              URL.revokeObjectURL(url)
+              showToast('Exported as JSON!')
+            }}>📤</button>
+            <button className="te-hero-btn" title="Settings" onClick={() => showToast('Settings coming soon.')}>⚙️</button>
           </div>
         </div>
 
@@ -590,25 +947,28 @@ export default function TasksEvents() {
             <p className="te-stat-num">{cur.count}</p>
             <p className="te-stat-sub">Keep it up! 🔥</p>
             <div className="te-stat-pill">
-              <span>📊</span>
-              {cur.sub}
+              <span>📊</span> {cur.sub}
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── PENDING TAB ──────────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════
+          PENDING TAB
+         ══════════════════════════════════════════════════════ */}
       {tab === 'pending' && (
-        <>
-          {pending.length === 0 ? (
+        pending.length === 0
+          ? (
             <div className="te-empty">
-              <div className="te-empty-icon">🙂</div>
+              <div className="te-empty-icon" style={{ fontSize:40 }}>🙂</div>
               <h3>Your plate is clear!</h3>
-              <p>You have no pending tasks.<br/>Tap the + button to add new task and keep moving forward.</p>
+              <p>You have no pending tasks.<br/>Click the + button to add a new task and keep moving forward.</p>
             </div>
           ) : (
             <>
-              <p className="te-swipe-hint">swipe right to mark as done, swipe left to mark as cancelled</p>
+              <p className="te-swipe-hint">
+                Drag a card right to mark done · left to cancel/delete · click to view details
+              </p>
               {Object.entries(groups).map(([cat, catItems]) => (
                 <div key={cat}>
                   <div className="te-group-header">
@@ -617,131 +977,263 @@ export default function TasksEvents() {
                       {cat}
                     </div>
                     <span className="te-group-next">
-                      {nextDue(catItems) ? `Next: ${formatDate(nextDue(catItems))}` : ''}
+                      {nextDueInGroup(catItems) ? `Next: ${formatDate(nextDueInGroup(catItems))}` : ''}
                     </span>
                   </div>
                   {catItems.map(item => {
-                    const b = badge(item)
+                    const b = getBadge(item)
                     return (
-                      <div key={item.id} className="te-item-card">
-                        <button
-                          className={`te-item-check${item.done?' done':''}`}
-                          onClick={() => toggleItem(item.id)}
-                        >{item.done && '✓'}</button>
-                        <div className="te-item-body">
-                          <p className={`te-item-name${item.done?' done':''}`}>{item.name}</p>
-                          <p className="te-item-meta">
-                            {item.due && formatDate(item.due)} · 8:00 AM
-                          </p>
+                      <SwipeCard
+                        key={item.id}
+                        onDone={() => { toggleItem(item.id); showToast(`"${item.name}" marked done!`) }}
+                        onCancel={() => setModal({ type:'confirm',
+                          title:'Remove task?',
+                          message:`"${item.name}" will be deleted.`,
+                          confirmLabel:'Delete',
+                          onConfirm: () => deleteItem(item.id),
+                        })}
+                      >
+                        <div
+                          className="te-item-card"
+                          onClick={() => setModal({ type:'detail', item })}
+                        >
+                          <button
+                            className={`te-item-check${item.done?' done':''}`}
+                            onClick={e => { e.stopPropagation(); toggleItem(item.id); showToast(`"${item.name}" marked done!`) }}
+                          >{item.done && '✓'}</button>
+                          <div className="te-item-body">
+                            <p className={`te-item-name${item.done?' done':''}`}>{item.name}</p>
+                            <p className="te-item-meta">
+                              {item.type === 'event'
+                                ? `${formatDate(item.startDate)} → ${formatDate(item.due)} (${item.duration}d)`
+                                : item.due ? `${formatDate(item.due)} · ${item.remindTime ? formatTime(item.remindTime) : '8:00 AM'}` : 'No due date'
+                              }
+                            </p>
+                          </div>
+                          {b && <span className={`te-item-badge ${b.cls}`}>{b.text}</span>}
+                          <button
+                            className="te-item-delete"
+                            onClick={e => { e.stopPropagation(); deleteItem(item.id) }}
+                            title="Delete"
+                          >×</button>
                         </div>
-                        {b && <span className={`te-item-badge ${b.cls}`}>{b.text}</span>}
-                        <button className="te-item-delete" onClick={() => deleteItem(item.id)}>×</button>
-                      </div>
+                      </SwipeCard>
                     )
                   })}
                 </div>
               ))}
             </>
-          )}
-        </>
+          )
       )}
 
-      {/* ── REPEATS TAB ──────────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════
+          REPEATS TAB
+         ══════════════════════════════════════════════════════ */}
       {tab === 'repeats' && (
-        <>
-          {repeats.length === 0 ? (
+        repeats.length === 0
+          ? (
             <div className="te-empty">
-              <div className="te-empty-icon">↻</div>
+              <div className="te-empty-icon" style={{ display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, fontWeight:700 }}>↻</div>
               <h3>No repeating reminders</h3>
-              <p>Set one up and it'll fire every week on the days you pick.<br/>Tap the + button to create one.</p>
+              <p>Set one up and it'll fire every week on the days you pick.<br/>Click the + button to create one.</p>
             </div>
           ) : (
             repeats.map(r => {
-              const dayLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-              const on = r.days.length ? r.days.map(d => dayLabels[d]).join(', ') : 'No days set'
+              const on = r.days.length
+                ? r.days.map(d => DOW_LABELS[d]).join(', ')
+                : 'No days set'
               return (
-                <div key={r.id} className="te-item-card">
-                  <span style={{ fontSize:22 }}>↻</span>
+                <div key={r.id} className="te-item-card" style={{ cursor:'pointer' }}
+                  onClick={() => { setEdit(r); setModal('repeat') }}
+                >
+                  <span style={{ fontSize:22, flexShrink:0 }}>↻</span>
                   <div className="te-item-body">
                     <p className="te-item-name">{r.name}</p>
-                    <p className="te-item-meta">{on} · {r.time}</p>
+                    <p className="te-item-meta">{on} · {formatTime(r.time)}</p>
                   </div>
-                  <button className="te-item-delete" onClick={() => deleteRepeat(r.id)}>×</button>
+                  <button
+                    className="te-item-delete"
+                    onClick={e => {
+                      e.stopPropagation()
+                      setModal({ type:'confirm',
+                        title:'Delete reminder?',
+                        message:`"${r.name}" will be permanently removed.`,
+                        confirmLabel:'Delete',
+                        onConfirm: () => deleteRepeat(r.id),
+                      })
+                    }}
+                  >×</button>
                 </div>
               )
             })
-          )}
-        </>
+          )
       )}
 
-      {/* ── HISTORY TAB ──────────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════
+          HISTORY TAB
+         ══════════════════════════════════════════════════════ */}
       {tab === 'history' && (
-        <>
-          {history.length === 0 ? (
+        history.length === 0
+          ? (
             <div className="te-empty">
-              <div className="te-empty-icon">📜</div>
+              <div className="te-empty-icon" style={{ fontSize:28 }}>📜</div>
               <h3>No completed tasks yet</h3>
               <p>Tasks you mark as done will appear here.</p>
             </div>
           ) : (
-            Object.entries(histGroups)
-              .sort(([a],[b]) => b.localeCompare(a))
-              .map(([date, dateItems]) => (
-                <div key={date}>
-                  <p className="te-history-date">{formatDate(date)}</p>
-                  {dateItems.map(item => (
-                    <div key={item.id} className="te-history-card">
-                      <div className="te-history-check">✓</div>
-                      <div className="te-history-body">
-                        <p className="te-history-name">{item.name}</p>
-                        <p className="te-history-meta">
-                          Due: {formatDate(item.due)} · Done at {item.completedAt ? new Date(item.completedAt).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}) : ''}
-                        </p>
+            <>
+              <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:8 }}>
+                <button className="te-text-btn" onClick={() => setModal({ type:'confirm',
+                  title:'Clear all history',
+                  message:'All completed tasks will be permanently removed.',
+                  confirmLabel:'Clear History',
+                  onConfirm: clearHistory,
+                })}>
+                  🗑 Clear all
+                </button>
+              </div>
+              {Object.entries(histGrps)
+                .sort(([a],[b]) => b.localeCompare(a))
+                .map(([date, dateItems]) => (
+                  <div key={date}>
+                    <p className="te-history-date">{formatDate(date)}</p>
+                    {dateItems.map(item => (
+                      <div key={item.id} className="te-history-card">
+                        <div className="te-history-check">✓</div>
+                        <div className="te-history-body">
+                          <p className="te-history-name">{item.name}</p>
+                          <p className="te-history-meta">
+                            Due: {formatDate(item.due)} · Done at {item.completedAt
+                              ? new Date(item.completedAt).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})
+                              : '—'}
+                          </p>
+                        </div>
+                        <button
+                          className="te-restore-btn"
+                          title="Restore to Pending"
+                          onClick={() => restoreItem(item.id)}
+                        >↩</button>
+                        <button
+                          className="te-history-delete"
+                          title="Delete"
+                          onClick={() => deleteItem(item.id)}
+                        >×</button>
                       </div>
-                      <button className="te-history-delete" onClick={() => deleteItem(item.id)}>🗑</button>
-                    </div>
-                  ))}
-                </div>
-              ))
-          )}
-        </>
+                    ))}
+                  </div>
+                ))
+              }
+            </>
+          )
       )}
 
-      {/* ── CHECKLIST TAB ────────────────────────────────────── */}
+      {/* ══════════════════════════════════════════════════════
+          CHECKLIST TAB
+         ══════════════════════════════════════════════════════ */}
       {tab === 'checklist' && (
-        <>
-          {clItems.length === 0 ? (
+        clItems.length === 0
+          ? (
             <div className="te-empty">
-              <div className="te-empty-icon">☰</div>
+              <div className="te-empty-icon" style={{ fontSize:24, fontWeight:700 }}>☰</div>
               <h3>Nothing on your checklist</h3>
-              <p>A quick tick-off list for anything that doesn't need a due date.<br/>Tap the + button to add an item.</p>
+              <p>A quick tick-off list for anything that doesn't need a due date.<br/>Click + to add an item.</p>
             </div>
           ) : (
-            clItems.map(item => (
-              <div key={item.id} className="te-checklist-item">
-                <button
-                  className={`te-checklist-cb${item.done?' done':''}`}
-                  onClick={() => toggleCl(item.id)}
-                >{item.done && '✓'}</button>
-                <span className={`te-checklist-name${item.done?' done':''}`}>{item.name}</span>
-                <button className="te-item-delete" onClick={() => deleteCl(item.id)}>×</button>
+            <>
+              <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginBottom:8 }}>
+                {clItems.some(i => i.done) && (
+                  <button className="te-text-btn" onClick={clearDoneChecklist}>✓ Clear done</button>
+                )}
+                <button className="te-text-btn te-text-btn-red" onClick={() => setModal({ type:'confirm',
+                  title:'Clear checklist?',
+                  message:'All items will be removed.',
+                  confirmLabel:'Clear All',
+                  onConfirm: clearChecklist,
+                })}>🗑 Clear all</button>
               </div>
-            ))
-          )}
-        </>
+              {clItems.map(item => (
+                <div key={item.id} className="te-checklist-item">
+                  <button
+                    className={`te-checklist-cb${item.done?' done':''}`}
+                    onClick={() => toggleCl(item.id)}
+                  >{item.done && '✓'}</button>
+                  <span className={`te-checklist-name${item.done?' done':''}`}>{item.name}</span>
+                  <button className="te-item-delete" onClick={() => deleteCl(item.id)}>×</button>
+                </div>
+              ))}
+            </>
+          )
       )}
 
-      {/* FAB — hidden on history tab */}
-      {tab !== 'history' && (
-        <button className="te-fab" onClick={fabClick} aria-label="Add">+</button>
+      {/* ── FAB ─────────────────────────────────────────────── */}
+      <button
+        className="te-fab"
+        onClick={fabClick}
+        title={tab==='history' ? 'Clear history' : 'Add'}
+        style={{ background: tab==='history' ? '#d9534f' : undefined }}
+      >
+        {tab === 'history' ? '🗑' : '+'}
+      </button>
+
+      {/* ── Toast ───────────────────────────────────────────── */}
+      {toast && <Toast msg={toast} onDone={() => setToast(null)} />}
+
+      {/* ══════════════════════════════════════════════════════
+          MODALS
+         ══════════════════════════════════════════════════════ */}
+
+      {modal === 'choose' && (
+        <ChooseTypeSheet onClose={() => setModal(null)} onChoose={t => setModal(t)} />
       )}
 
-      {/* ── Modals ───────────────────────────────────────────── */}
-      {modal === 'choose'    && <ChooseTypeSheet onClose={() => setModal(null)} onChoose={t => setModal(t)} />}
-      {modal === 'task'      && <TaskFormModal   onClose={() => setModal(null)} onAdd={addItem} />}
-      {modal === 'event'     && <EventFormModal  onClose={() => setModal(null)} onAdd={addItem} />}
-      {modal === 'repeat'    && <RepeatFormModal onClose={() => setModal(null)} onAdd={addRepeat} />}
-      {modal === 'checklist' && <ChecklistModal  onClose={() => setModal(null)} onAdd={addClItem} />}
+      {modal === 'task' && (
+        <TaskFormModal
+          onClose={() => { setModal(null); setEdit(null) }}
+          onAdd={addItem}
+          editItem={editTarget}
+        />
+      )}
+
+      {modal === 'event' && (
+        <EventFormModal
+          onClose={() => { setModal(null); setEdit(null) }}
+          onAdd={addItem}
+          editItem={editTarget}
+        />
+      )}
+
+      {modal === 'repeat' && (
+        <RepeatFormModal
+          onClose={() => { setModal(null); setEdit(null) }}
+          onAdd={addRepeat}
+          editItem={editTarget}
+        />
+      )}
+
+      {modal === 'checklist' && (
+        <ChecklistModal onClose={() => setModal(null)} onAdd={addClItem} />
+      )}
+
+      {modal?.type === 'detail' && (
+        <ItemDetailModal
+          item={modal.item}
+          onClose={() => setModal(null)}
+          onEdit={item => { setEdit(item); setModal(item.type === 'event' ? 'event' : 'task') }}
+          onDelete={id => { deleteItem(id); showToast('Task deleted.') }}
+          onToggle={id => { toggleItem(id); showToast('Status updated!') }}
+        />
+      )}
+
+      {modal?.type === 'confirm' && (
+        <ConfirmModal
+          title={modal.title}
+          message={modal.message}
+          confirmLabel={modal.confirmLabel}
+          confirmColor={modal.confirmColor}
+          onConfirm={modal.onConfirm}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   )
 }

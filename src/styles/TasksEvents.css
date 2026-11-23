@@ -731,3 +731,99 @@
   border: 0; background: transparent; font-size: 13px; color: #087bc4; font-weight: 600;
   cursor: pointer; outline: none;
 }
+
+/* ── Scrollable modal (for event form with calendar) ───────── */
+.te-modal-scroll {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* ── Name input error state ────────────────────────────────── */
+.te-name-input.error { border-bottom-color: #d9534f; }
+
+/* ── Next fire info row ────────────────────────────────────── */
+.te-next-fire {
+  font-size: 12px;
+  color: #42566a;
+  background: #eef6fe;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Detail modal rows ─────────────────────────────────────── */
+.te-detail-rows { display: flex; flex-direction: column; gap: 10px; }
+.te-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f8fbff;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.te-detail-row > span { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.te-detail-row > div { flex: 1; }
+.te-detail-row strong { display: block; font-size: 11px; font-weight: 700; color: #8fa0b0; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+.te-detail-row span   { color: #1d3547; }
+
+/* ── Restore button (history) ──────────────────────────────── */
+.te-restore-btn {
+  border: 0;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #e3f0fb;
+  color: #087bc4;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.12s;
+  margin-right: 4px;
+}
+.te-restore-btn:hover { background: #c3dff5; }
+
+/* ── Text action buttons ───────────────────────────────────── */
+.te-text-btn {
+  border: 1px solid #dde3ea;
+  background: #fff;
+  color: #42566a;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.te-text-btn:hover { background: #f4f7fa; }
+.te-text-btn-red { border-color: #f8d7da; color: #842029; }
+.te-text-btn-red:hover { background: #f8d7da; }
+
+/* ── Toast notification ────────────────────────────────────── */
+.te-toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1d3547;
+  color: #fff;
+  font-size: 13px;
+  padding: 10px 20px;
+  border-radius: 24px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  z-index: 999;
+  white-space: nowrap;
+  animation: fadeIn 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Preset chip active ────────────────────────────────────── */
+.te-preset-chip.active {
+  border-color: #087bc4;
+  background: #087bc4;
+  color: #fff;
+}
