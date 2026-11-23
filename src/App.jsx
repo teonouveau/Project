@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Homepage from "./pages/Homepage";
+import LoadingPage from "./pages/loadingpPage";
 
 function PrivateRoute({ children }) {
   let user = null;
@@ -25,6 +27,17 @@ function GuestRoute({ children }) {
 }
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setIsLoading(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return <LoadingPage />;
+  }
+
   return (
     <>
       <Routes>
