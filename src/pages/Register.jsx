@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import '../styles/auth.css'
-import { apiRequest } from '../services/api'
+import { registerAccount } from '../services/auth'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -16,29 +16,15 @@ export default function Register() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name.trim()) {
-      setError('Please enter your full name.')
-      return
-    }
     if (form.password !== form.confirm) {
       setError('Passwords do not match.')
       return
     }
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters.')
-      return
-    }
+
     setLoading(true)
     setError('')
     try {
-      await apiRequest('/api/auth/register', {
-        method: 'POST',
-        body: {
-          name: form.name.trim(),
-          email: form.email.trim(),
-          password: form.password,
-        },
-      })
+      await registerAccount(form)
       navigate('/login')
     } catch (err) {
       setError(err.message || 'Unable to create account.')

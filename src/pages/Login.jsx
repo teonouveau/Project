@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import '../styles/auth.css'
-import { apiRequest } from '../services/api'
+import { loginAccount } from '../services/auth'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -19,11 +19,7 @@ export default function Login() {
     setLoading(true)
     setError('')
     try {
-      const user = await apiRequest('/api/auth/login', {
-        method: 'POST',
-        body: { email: form.email.trim(), password: form.password },
-      })
-      localStorage.setItem('skwela_user', JSON.stringify(user))
+      await loginAccount(form.email, form.password)
       navigate('/homepage')
     } catch (err) {
       setError(err.message || 'Unable to sign in.')

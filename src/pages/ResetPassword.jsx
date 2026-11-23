@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import '../styles/auth.css'
-import { apiRequest } from '../services/api'
+import { changeAccountPassword } from '../services/auth'
 
 const STEP = { EMAIL: 'email', NEW_PASSWORD: 'new_password', DONE: 'done' }
 
@@ -36,15 +36,11 @@ export default function ResetPassword() {
       return
     }
     setLoading(true)
-    setError('')
     try {
-      await apiRequest('/api/auth/password', {
-        method: 'POST',
-        body: {
-          email,
-          currentPassword: form.currentPassword,
-          newPassword: form.newPassword,
-        },
+      await changeAccountPassword({
+        email,
+        currentPassword: form.currentPassword,
+        newPassword: form.newPassword,
       })
       setStep(STEP.DONE)
     } catch (err) {
