@@ -20,7 +20,7 @@ export default function Login() {
     setError('')
     try {
       await loginAccount(form.email, form.password)
-      navigate('/homepage')
+      navigate('/setup')
     } catch (err) {
       setError(err.message || 'Unable to sign in.')
     } finally {
@@ -29,7 +29,7 @@ export default function Login() {
   }
 
   return (
-    <div className="page">
+    <div className="page auth-blue">
       <div className="card">
         <div className="brand">
           <span className="brandIcon">🎓</span>

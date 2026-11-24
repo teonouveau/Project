@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import owlImage from '../assets/owl1-transparent.png'
 import '../styles/TasksEvents.css'
 
 /* ════════════════════════════════════════════════════════════
@@ -730,6 +731,18 @@ function Toast({ msg, onDone }) {
    ════════════════════════════════════════════════════════════ */
 export default function TasksEvents() {
   const [tab, setTab] = useState('pending')
+  const [classroomConnectOpen, setClassroomConnectOpen] = useState(false)
+  const [skipClassroomWarning, setSkipClassroomWarning] = useState(
+    () => localStorage.getItem('te_skip_classroom_warning') === 'true',
+  )
+
+  function connectClassroom() {
+    if (localStorage.getItem('te_skip_classroom_warning') === 'true') {
+      window.open('https://classroom.google.com/', '_blank', 'noopener,noreferrer')
+      return
+    }
+    setClassroomConnectOpen(true)
+  }
 
   /* ── items ─────────────────────────────────────────────── */
   const [items, setItems] = useState(() => load('te_items', []))
@@ -864,7 +877,7 @@ export default function TasksEvents() {
   const histGrps = groupBy(history, i => i.completedAt?.split('T')[0] || 'Unknown')
 
   const TAB_DATA = {
-    pending:   { label:'Pending',   icon:'',   count: pending.length,  sub: `${history.length} completed` },
+    pending:   { label:'Pending',   icon:'',   count: pending.length,  sub: `${history.length} task completed` },
     repeats:   { label:'Repeats',   icon:'↻ ', count: repeats.length,  sub: `${repeats.length} repeating reminders` },
     history:   { label:'History',   icon:'◷ ', count: history.length,  sub: `${history.length} task completed` },
     checklist: { label:'Checklist', icon:'☰ ', count: clItems.length,  sub: `${clItems.filter(i=>i.done).length}/${clItems.length} done` },
@@ -914,17 +927,28 @@ export default function TasksEvents() {
             <p>Stay on track, achieve more. ✨</p>
           </div>
           <div className="te-hero-actions">
-            <button className="te-hero-btn" title="Sync data" onClick={() => showToast('Data synced!')}>↻</button>
-            <button className="te-hero-btn" title="Export" onClick={() => {
-              const data = JSON.stringify({ items, repeats, clItems }, null, 2)
-              const blob = new Blob([data], { type:'application/json' })
-              const url  = URL.createObjectURL(blob)
-              const a    = document.createElement('a')
-              a.href = url; a.download = 'eskwela-tasks.json'; a.click()
-              URL.revokeObjectURL(url)
-              showToast('Exported as JSON!')
-            }}>📤</button>
-            <button className="te-hero-btn" title="Settings" onClick={() => showToast('Settings coming soon.')}>⚙️</button>
+            <button className="te-hero-btn" type="button" title="Sync data" aria-label="Sync data" onClick={() => showToast('Data synced!')}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7V3m0 0h-4m4 0-3.2 3.2A8 8 0 0 0 4 9m0 8v4m0 0h4m-4 0 3.2-3.2A8 8 0 0 0 20 15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+            <button
+              className="te-hero-btn te-classroom-btn"
+              type="button"
+              onClick={connectClassroom}
+              title="Google Classroom"
+              aria-label="Connect Google Classroom"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2" y="3" width="20" height="18" rx="3" fill="#0f9d58" />
+                <rect x="5" y="6" width="14" height="12" rx="1.5" fill="#fff" />
+                <circle cx="9" cy="10" r="1.7" fill="#fbbc04" />
+                <circle cx="15" cy="10" r="1.7" fill="#4285f4" />
+                <path d="M6.7 15c.2-1.6 1-2.4 2.3-2.4s2.1.8 2.3 2.4M12.7 15c.2-1.6 1-2.4 2.3-2.4s2.1.8 2.3 2.4" fill="none" stroke="#0f9d58" strokeWidth="1.3" strokeLinecap="round" />
+                <path d="M4 5V4.5A1.5 1.5 0 0 1 5.5 3H8" fill="none" stroke="#34a853" strokeWidth="1.5" />
+              </svg>
+            </button>
+            <button className="te-hero-btn" type="button" title="Settings" aria-label="Settings" onClick={() => showToast('Settings coming soon.')}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13.5 21 14.7l-1.6 2.8-1.9-.8a7.8 7.8 0 0 1-1.6.9l-.3 2h-3.2l-.3-2a7.8 7.8 0 0 1-1.6-.9l-1.9.8L7 14.7l1.6-1.2a7 7 0 0 1 0-1.9L7 10.4l1.6-2.8 1.9.8a7.8 7.8 0 0 1 1.6-.9l.3-2h3.2l.3 2a7.8 7.8 0 0 1 1.6.9l1.9-.8 1.6 2.8-1.6 1.2a7 7 0 0 1 0 1.9ZM14 12a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z" fill="currentColor"/></svg>
+            </button>
           </div>
         </div>
 
@@ -935,15 +959,20 @@ export default function TasksEvents() {
               className={`te-tab${tab===t?' active':''}`}
               onClick={() => setTab(t)}
             >
-              {TAB_DATA[t].icon}{TAB_DATA[t].label}
+              {t === 'pending' ? (
+                <svg className="te-tab-calendar" viewBox="0 0 16 16" aria-hidden="true">
+                  <rect x="2" y="3" width="12" height="11" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M5 2v3M11 2v3M2 6h12M5 8h1M8 8h1M11 8h1M5 11h1M8 11h1" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                </svg>
+              ) : TAB_DATA[t].icon}{TAB_DATA[t].label}
             </button>
           ))}
         </div>
 
         <div className="te-stat-card">
-          <span className="te-stat-mascot">🦉</span>
+          <img className="te-stat-mascot" src={owlImage} alt="" />
           <div className="te-stat-body">
-            <p className="te-stat-label">{cur.label}</p>
+            <p className="te-stat-label">{tab === 'pending' ? 'Task Remaining' : cur.label}</p>
             <p className="te-stat-num">{cur.count}</p>
             <p className="te-stat-sub">Keep it up! 🔥</p>
             <div className="te-stat-pill">
@@ -960,7 +989,12 @@ export default function TasksEvents() {
         pending.length === 0
           ? (
             <div className="te-empty">
-              <div className="te-empty-icon" style={{ fontSize:40 }}>🙂</div>
+              <div className="te-empty-icon te-empty-smile" aria-hidden="true">
+                <svg viewBox="0 0 64 36">
+                  <path d="M9 10c5 15 41 15 46 0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                  <path d="m8 10-3-2m54 2 3-2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </div>
               <h3>Your plate is clear!</h3>
               <p>You have no pending tasks.<br/>Click the + button to add a new task and keep moving forward.</p>
             </div>
@@ -1181,6 +1215,72 @@ export default function TasksEvents() {
       {/* ══════════════════════════════════════════════════════
           MODALS
          ══════════════════════════════════════════════════════ */}
+
+      {classroomConnectOpen && (
+        <div
+          className="te-classroom-overlay"
+          onClick={event => {
+            if (event.target === event.currentTarget) setClassroomConnectOpen(false)
+          }}
+        >
+          <section
+            className="te-classroom-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="te-classroom-title"
+          >
+            <div className="te-classroom-modal-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="2" y="3" width="20" height="18" rx="3" fill="#0f9d58" />
+                <rect x="5" y="6" width="14" height="12" rx="1.5" fill="#fff" />
+                <circle cx="9" cy="10" r="1.7" fill="#fbbc04" />
+                <circle cx="15" cy="10" r="1.7" fill="#4285f4" />
+                <path d="M6.7 15c.2-1.6 1-2.4 2.3-2.4s2.1.8 2.3 2.4M12.7 15c.2-1.6 1-2.4 2.3-2.4s2.1.8 2.3 2.4" fill="none" stroke="#0f9d58" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h2 id="te-classroom-title">Connect Google Classroom</h2>
+            <p className="te-classroom-description">
+              You'll sign in with the Google account you use for Classroom. Eskwela Ta can read your class list and coursework details to help organize your tasks. We don't add or change anything in your classes.
+            </p>
+            <div className="te-classroom-warning" role="note">
+              <span aria-hidden="true">⚠</span>
+              <p>Make sure you pick the same Gmail account you actually use in Google Classroom. Signing in with a different account won't find your classes.</p>
+            </div>
+            <a
+              className="te-classroom-privacy"
+              href="https://policies.google.com/privacy"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Learn more about our Privacy Policy <span aria-hidden="true">→</span>
+            </a>
+            <label className="te-classroom-skip">
+              <input
+                type="checkbox"
+                checked={skipClassroomWarning}
+                onChange={event => setSkipClassroomWarning(event.target.checked)}
+              />
+              <span>Don't show this again</span>
+            </label>
+            <footer className="te-classroom-actions">
+              <button type="button" onClick={() => setClassroomConnectOpen(false)}>Cancel</button>
+              <a
+                href="https://classroom.google.com/"
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  if (skipClassroomWarning) {
+                    localStorage.setItem('te_skip_classroom_warning', 'true')
+                  }
+                  setClassroomConnectOpen(false)
+                }}
+              >
+                Continue
+              </a>
+            </footer>
+          </section>
+        </div>
+      )}
 
       {modal === 'choose' && (
         <ChooseTypeSheet onClose={() => setModal(null)} onChoose={t => setModal(t)} />

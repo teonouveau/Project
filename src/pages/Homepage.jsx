@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import startImage from '../assets/start-transparent.png'
 import '../styles/Home.css'
 import TasksEvents from './TasksEvents'
+import Study from './Study'
+import GwaCalculato from './GwaCalculato'
+import Schedule from './Schedule'
 
 const VERSES = [
   { text: '"Commit to the Lord whatever you do, and He will establish your plans."', ref: '– Proverbs 16:3' },
@@ -60,24 +64,13 @@ const PAGE_TITLES = {
   home: 'Dashboard',
   tasks: 'Tasks & Events',
   schedule: 'Schedule',
-  study: 'Study',
+  study: 'Note Generator',
   gwa: 'GWA Calculator',
 }
 
 const SAMPLE_SCHEDULE = [
   { id: 1, name: 'No classes today', time: 'Have a great day!', color: 'green' },
 ]
-
-/* ── Placeholder panel ─────────────────────────────────────── */
-function ComingSoon({ icon, title }) {
-  return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:320, color:'#8fa0b0', gap:12 }}>
-      <span style={{ fontSize:52 }}>{icon}</span>
-      <h2 style={{ margin:0, color:'#42566a', fontSize:22 }}>{title}</h2>
-      <p style={{ margin:0, fontSize:14 }}>Coming soon</p>
-    </div>
-  )
-}
 
 /* ══════════════════════════════════════════════════════════════
    Homepage
@@ -89,7 +82,10 @@ export default function Homepage() {
   let user = null
   try { user = JSON.parse(localStorage.getItem('skwela_user')) }
   catch { localStorage.removeItem('skwela_user') }
-  const displayName = user?.name?.trim() || 'User'
+  let setup = null
+  try { setup = JSON.parse(localStorage.getItem('skwela_setup')) }
+  catch { localStorage.removeItem('skwela_setup') }
+  const displayName = setup?.name?.trim() || user?.name?.trim() || 'User'
   const initials = displayName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
 
   const verse = VERSES[new Date().getDay() % VERSES.length]
@@ -105,11 +101,14 @@ export default function Homepage() {
 
   const [newTask, setNewTask] = useState('')
   const [newDue,  setNewDue]  = useState('')
+  const [inlineTaskOpen, setInlineTaskOpen] = useState(false)
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false)
   function addTaskInline(e) {
     e.preventDefault()
     if (!newTask.trim()) return
     saveTasks([...tasks, { id: Date.now(), name: newTask.trim(), due: newDue, done: false }])
     setNewTask(''); setNewDue('')
+    setInlineTaskOpen(false)
   }
 
   /* ── study note modal ──────────────────────────────────── */
@@ -138,12 +137,12 @@ export default function Homepage() {
 
   /* ── render ────────────────────────────────────────────── */
   return (
-    <div className="home-page">
+    <div className={`home-page${activeNav === 'home' ? ' home-mode' : ''}${activeNav === 'study' ? ' study-mode' : ''}${activeNav === 'gwa' ? ' gwa-mode' : ''}${activeNav === 'schedule' ? ' schedule-mode' : ''}${activeNav === 'tasks' ? ' tasks-mode' : ''}`}>
 
       {/* ── Sidebar ──────────────────────────────────────────── */}
       <aside className="home-sidebar">
         <div className="home-sidebar-brand">
-          <span className="owl">🦉</span>
+        <img className="owl" src={startImage} alt="" />
           <span>ESKWELA TA</span>
         </div>
 
@@ -172,54 +171,105 @@ export default function Homepage() {
       </aside>
 
       {/* ── Top Bar ──────────────────────────────────────────── */}
-      <header className="home-topbar">
+      <header className={`home-topbar${['home', 'study', 'gwa'].includes(activeNav) ? ' home-topbar-themed' : ''}${activeNav === 'study' ? ' study-topbar' : ''}${activeNav === 'gwa' ? ' gwa-topbar' : ''}`}>
         <div className="home-topbar-left">
           <h1>{PAGE_TITLES[activeNav]}</h1>
-          <p>{today()}</p>
+          <p>
+            {activeNav === 'home'
+              ? 'Stay on track, achieve more. ✨'
+              : activeNav === 'study'
+                ? 'Study well - Owly'
+                : activeNav === 'gwa'
+                  ? 'Track your progress and achieve more.'
+                : today()}
+          </p>
         </div>
         <div className="home-topbar-right">
-          <div className="topbar-streak">
-            <span>💧</span>
-            <strong>{streak}</strong>
-            <span style={{ fontSize:11, fontWeight:400, color:'#5a8aaa' }}>streak</span>
-          </div>
-          <div style={{ position:'relative' }} ref={settingsRef}>
-            <button className="topbar-btn" onClick={() => setSettingsOpen(o => !o)} title="Settings">⚙️</button>
-            {settingsOpen && (
-              <div className="settings-dropdown">
-                <button onClick={() => setSettingsOpen(false)}>👤 &nbsp;Profile</button>
-                <button onClick={() => setSettingsOpen(false)}>⚙️ &nbsp;Settings</button>
-                <hr />
-                <button className="danger" onClick={handleLogout}>🚪 &nbsp;Sign out</button>
-              </div>
-            )}
-          </div>
+          {activeNav === 'home' ? (
+            <>
+              <button
+                className="topbar-btn"
+                type="button"
+                title="Refresh dashboard"
+                aria-label="Refresh dashboard"
+                onClick={() => window.location.reload()}
+              >
+                ↻
+              </button>
+              <button
+                className="topbar-btn"
+                type="button"
+                title="Open schedule"
+                aria-label="Open schedule"
+                onClick={() => setActiveNav('schedule')}
+              >
+                <IconSchedule />
+              </button>
+            </>
+          ) : activeNav !== 'study' && activeNav !== 'gwa' ? (
+            <div className="topbar-streak">
+              <span>💧</span>
+              <strong>{streak}</strong>
+              <span style={{ fontSize:11, fontWeight:400, color:'#5a8aaa' }}>streak</span>
+            </div>
+          ) : null}
+          {activeNav !== 'home' && (
+            <div style={{ position:'relative' }} ref={settingsRef}>
+              <button className="topbar-btn" onClick={() => setSettingsOpen(o => !o)} title="Settings">⚙️</button>
+              {settingsOpen && (
+                <div className="settings-dropdown">
+                  <button onClick={() => setSettingsOpen(false)}>👤 &nbsp;Profile</button>
+                  <button onClick={() => setSettingsOpen(false)}>⚙️ &nbsp;Settings</button>
+                  <hr />
+                  <button className="danger" onClick={handleLogout}>🚪 &nbsp;Sign out</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
       {/* ── Main Content ─────────────────────────────────────── */}
-      <main className="home-content">
+      <main className={`home-content${['study', 'gwa'].includes(activeNav) ? ' has-themed-topbar' : ''}${activeNav === 'schedule' ? ' schedule-content' : ''}`}>
 
         {/* Tasks & Events */}
         {activeNav === 'tasks'    && <TasksEvents />}
 
         {/* Placeholders */}
-        {activeNav === 'schedule' && <ComingSoon icon="📅" title="Schedule" />}
-        {activeNav === 'study'    && <ComingSoon icon="📖" title="Study" />}
-        {activeNav === 'gwa'      && <ComingSoon icon="🎓" title="GWA Calculator" />}
+        {activeNav === 'schedule' && <Schedule />}
+        {activeNav === 'study'    && <Study />}
+        {activeNav === 'gwa'      && <GwaCalculato />}
 
         {/* Home Dashboard */}
         {activeNav === 'home' && (
           <>
             {/* Hero */}
             <section className="home-hero">
-              <div className="home-mascot" aria-hidden="true">🦉</div>
+              <div className="home-hero-brand">ESKWELA TA</div>
+              <img className="home-mascot" src={startImage} alt="Eskwela Ta mascot" />
               <div className="home-speech">
                 <strong>Hello, {displayName}!</strong>
                 <span>{verse.text}</span>
                 <small>{verse.ref}</small>
               </div>
               <div className="home-hero-spacer" />
+              <div className="home-hero-streak" aria-label={`${streak} day streak`}>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9.4 6.3 5.2 11 5.2 15.1a6.8 6.8 0 0 0 13.6 0C18.8 11 14.6 6.3 12 2.5Z" fill="currentColor"/><path d="M9 16.5a3 3 0 0 0 3 3" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                <span>{streak}</span>
+              </div>
+              <div className="home-hero-settings" ref={settingsRef}>
+                <button className="home-hero-settings-button" type="button" aria-label="Settings" title="Settings" onClick={() => setSettingsOpen(open => !open)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13.5 21 14.7l-1.6 2.8-1.9-.8a7.8 7.8 0 0 1-1.6.9l-.3 2h-3.2l-.3-2a7.8 7.8 0 0 1-1.6-.9l-1.9.8L7 14.7l1.6-1.2a7 7 0 0 1 0-1.9L7 10.4l1.6-2.8 1.9.8a7.8 7.8 0 0 1 1.6-.9l.3-2h3.2l.3 2a7.8 7.8 0 0 1 1.6.9l1.9-.8 1.6 2.8-1.6 1.2a7 7 0 0 1 0 1.9ZM14 12a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z" fill="currentColor"/></svg>
+                </button>
+                {settingsOpen && (
+                  <div className="settings-dropdown">
+                    <button onClick={() => setSettingsOpen(false)}>👤 &nbsp;Profile</button>
+                    <button onClick={() => setSettingsOpen(false)}>⚙️ &nbsp;Settings</button>
+                    <hr />
+                    <button className="danger" onClick={handleLogout}>🚪 &nbsp;Sign out</button>
+                  </div>
+                )}
+              </div>
             </section>
 
             {/* Two-column grid */}
@@ -228,12 +278,20 @@ export default function Homepage() {
               {/* Left */}
               <div>
                 <div className="home-today">
+                  <svg className="home-today-icon" viewBox="0 0 32 32" aria-hidden="true">
+                    <path d="M4 7.5h8a6 6 0 0 1 6 6v13a5 5 0 0 0-5-4H4zM28 7.5h-8a6 6 0 0 0-2 0M18 26.5a5 5 0 0 1 5-4h5v-15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round"/>
+                    <path d="M18 13.5v13a5 5 0 0 1 5-4h5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round"/>
+                  </svg>
+                  <div>
                   <h2>No classes today</h2>
-                  <p>Enjoy your break, bro. 🎉</p>
+                  <p>Enjoy your break, bro.</p>
+                  </div>
                 </div>
 
                 <button className="home-note" onClick={() => setNoteModalOpen(true)}>
-                  <div className="home-note-icon">📝</div>
+                  <div className="home-note-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M4 4h13v13H4z" fill="none" stroke="currentColor" strokeWidth="2"/><path d="m9 15 1.2-3.2L18.6 3.4a1.7 1.7 0 0 1 2.4 2.4l-8.4 8.4L9 15Z" fill="currentColor"/><path d="M7 20h13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                  </div>
                   <div className="home-note-text">
                     <strong>Make a study note</strong>
                     <span>Upload PDF to convert into a Note</span>
@@ -247,7 +305,10 @@ export default function Homepage() {
                     <span className="home-card-count">0/0</span>
                   </div>
                   <div className="home-card-body">
-                    <div className="home-empty"><span>📚</span><p>No classes today</p></div>
+                    <div className="home-empty">
+                      <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10l-1 5 4 3v2H4v-2l4-3-1-5ZM8 13l1.5 3h5L16 13M7 20h10M9 16v2m6-2v2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round"/></svg></span>
+                      <p>No classes today</p>
+                    </div>
                   </div>
                 </div>
 
@@ -260,7 +321,10 @@ export default function Homepage() {
 
                   {tasks.length === 0 ? (
                     <div className="home-card-body">
-                      <div className="home-empty"><span>📋</span><p>No tasks yet</p></div>
+                      <div className="home-empty">
+                        <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 0 0-2 2v13h16V7a2 2 0 0 0-2-2h-2M9 3h6v4H9zM8 11h8m-8 4h8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round"/></svg></span>
+                        <p>No tasks yet</p>
+                      </div>
                     </div>
                   ) : (
                     <div className="home-task-list">
@@ -287,18 +351,17 @@ export default function Homepage() {
                     </div>
                   )}
 
-                  <form className="home-add-task-row" onSubmit={addTaskInline}>
-                    <input
-                      type="text" placeholder="+ Add a task…" value={newTask}
-                      onChange={e => setNewTask(e.target.value)}
-                    />
-                    <input
-                      type="date" value={newDue} onChange={e => setNewDue(e.target.value)}
-                      style={{ width:130, height:36, border:'1px solid #dde3ea', borderRadius:8, padding:'0 8px', fontSize:13, color:'#1d3547', outline:'none' }}
-                    />
-                    <button type="submit">Add</button>
-                  </form>
                 </div>
+                {inlineTaskOpen ? (
+                  <form className="home-add-task-row" onSubmit={addTaskInline}>
+                    <input type="text" placeholder="Task name" value={newTask} onChange={e => setNewTask(e.target.value)} autoFocus />
+                    <input type="date" aria-label="Due date" value={newDue} onChange={e => setNewDue(e.target.value)} />
+                    <button type="submit">Add</button>
+                    <button type="button" className="home-add-task-cancel" onClick={() => { setInlineTaskOpen(false); setNewTask(''); setNewDue('') }}>Cancel</button>
+                  </form>
+                ) : (
+                  <button className="home-add-task-trigger" type="button" onClick={() => setInlineTaskOpen(true)}>＋ Add task</button>
+                )}
               </div>
 
               {/* Right */}
@@ -351,6 +414,72 @@ export default function Homepage() {
         )}
 
       </main>
+
+      <nav className="home-mobile-nav" aria-label="Main navigation">
+        {NAV_ITEMS.map(({ key, icon, label }) => (
+          <button
+            key={key}
+            className={`home-mobile-nav-item${activeNav === key ? ' active' : ''}`}
+            type="button"
+            onClick={() => setActiveNav(key)}
+          >
+            <span>{icon}</span>
+            <small>{key === 'tasks' ? 'Tasks & Events' : key === 'gwa' ? 'GWA Calculator' : label}</small>
+          </button>
+        ))}
+      </nav>
+
+      {activeNav === 'home' && (
+        <>
+          {quickActionsOpen && (
+            <div className="home-quick-actions" aria-label="Quick actions">
+              <button
+                type="button"
+                className="home-quick-action"
+                onClick={() => {
+                  setQuickActionsOpen(false)
+                  setActiveNav('schedule')
+                }}
+              >
+                <span>Upload schedule</span>
+                <i className="upload">+</i>
+              </button>
+              <button
+                type="button"
+                className="home-quick-action"
+                onClick={() => {
+                  setQuickActionsOpen(false)
+                  setActiveNav('schedule')
+                }}
+              >
+                <span>Edit schedule</span>
+                <i className="edit">+</i>
+              </button>
+              <button
+                type="button"
+                className="home-quick-action"
+                onClick={() => {
+                  setQuickActionsOpen(false)
+                  setNoteModalOpen(true)
+                }}
+              >
+                <span>Study note</span>
+                <i className="study">+</i>
+              </button>
+            </div>
+          )}
+          <button
+            className={`home-floating-add${quickActionsOpen ? ' open' : ''}`}
+            type="button"
+            aria-label={quickActionsOpen ? "Close quick actions" : "Open quick actions"}
+            aria-expanded={quickActionsOpen}
+            title={quickActionsOpen ? "Close quick actions" : "Open quick actions"}
+            onClick={() => setQuickActionsOpen(open => !open)}
+          >
+            {quickActionsOpen ? '×' : '+'}
+          </button>
+        </>
+      )}
 
       {/* ── Study Note Modal ─────────────────────────────────── */}
       {noteModalOpen && (

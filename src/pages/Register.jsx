@@ -25,7 +25,7 @@ export default function Register() {
     setError('')
     try {
       await registerAccount(form)
-      navigate('/login')
+      navigate('/login', { replace: true })
     } catch (err) {
       setError(err.message || 'Unable to create account.')
     } finally {
@@ -34,7 +34,7 @@ export default function Register() {
   }
 
   return (
-    <div className="page">
+    <div className="page auth-blue">
       <div className="card">
         <div className="brand">
           <span className="brandIcon">🎓</span>
