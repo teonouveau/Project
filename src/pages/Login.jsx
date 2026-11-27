@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import '../styles/auth.css'
 import { loginAccount } from '../services/auth'
+import PasswordToggleIcon from '../components/PasswordToggleIcon'
 
 export default function Login() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   function handleChange(e) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
@@ -61,17 +63,28 @@ export default function Login() {
               Password
               <Link to="/reset-password" className="labelLink">Forgot password?</Link>
             </label>
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="input"
-              placeholder="Your password"
-              value={form.password}
-              onChange={handleChange}
-            />
+            <div className="passwordInput">
+              <input
+                id="login-password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                className="input"
+                placeholder="Your password"
+                value={form.password}
+                onChange={handleChange}
+              />
+              <button
+                type="button"
+                className="passwordToggle"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((visible) => !visible)}
+              >
+                <PasswordToggleIcon visible={showPassword} />
+              </button>
+            </div>
           </div>
 
           <button type="submit" className="btn" disabled={loading}>

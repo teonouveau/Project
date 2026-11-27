@@ -6,6 +6,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Homepage from "./pages/Homepage";
 import LoadingPage from "./pages/LoadingPage";
 import Setup from "./pages/Setup";
+import Settings from "./pages/settings";
 
 function PrivateRoute({ children }) {
   let user = null;
@@ -33,6 +34,17 @@ export default function App() {
   useEffect(() => {
     const timer = window.setTimeout(() => setIsLoading(false), 4000);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    let theme = "light";
+    try {
+      const setup = JSON.parse(localStorage.getItem("skwela_setup") || "{}");
+      if (setup?.theme === "Dark") theme = "dark";
+    } catch {
+      localStorage.removeItem("skwela_setup");
+    }
+    document.documentElement.dataset.theme = theme;
   }, []);
 
   if (isLoading) {
@@ -66,6 +78,15 @@ export default function App() {
           element={
             <PrivateRoute>
               <Homepage />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <PrivateRoute>
+              <Settings />
             </PrivateRoute>
           }
         />

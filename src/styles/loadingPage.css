@@ -1,11 +1,15 @@
+@import url("https://fonts.googleapis.com/css2?family=Itim&display=swap");
+
 .loading-page {
   min-height: 100svh;
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: linear-gradient(135deg, #087bc4 0%, #0645ce 52%, #071bc4 100%);
+  background-color: #0334d6;
+  background-position: center 35%;
+  background-size: cover;
   color: #fff;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: Itim, cursive;
 }
 
 .loading-page-brand {
@@ -22,15 +26,96 @@
   width: min(68vw, 260px);
   height: auto;
   object-fit: contain;
+  position: relative;
+  z-index: 2;
+  opacity: 0;
+  transform: scale(0.82);
+  animation: loading-logo-fade 900ms cubic-bezier(0.22, 1, 0.36, 1) 200ms forwards,
+    loading-logo-splash 700ms cubic-bezier(0.22, 1, 0.36, 1) 1100ms 1;
+}
+
+.loading-page-logo-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.loading-page-splash {
+  position: absolute;
+  z-index: 1;
+  width: 46%;
+  aspect-ratio: 1;
+  border: 3px solid rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.2);
+  animation: loading-splash 800ms ease-out 1050ms 2;
+}
+
+.loading-page-splash::before,
+.loading-page-splash::after {
+  position: absolute;
+  inset: -13%;
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  border-radius: 50%;
+  content: "";
+}
+
+.loading-page-splash::after {
+  inset: -28%;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+@keyframes loading-logo-fade {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(12px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes loading-logo-splash {
+  0%, 100% {
+    transform: scale(1);
+  }
+
+  45% {
+    transform: scale(1.08);
+  }
+
+  70% {
+    transform: scale(0.98);
+  }
+}
+
+@keyframes loading-splash {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.2);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(2.5);
+  }
 }
 
 .loading-page-title {
   margin: 0;
   color: inherit;
-  font-size: clamp(30px, 8vw, 42px);
+  font-size: clamp(42px, 12vw, 56px);
+  font-family: "Itim", cursive;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1.15;
+  opacity: 0;
+  animation: loading-title-fade 600ms ease-out 700ms forwards;
 }
 
 .loading-page-dots {
@@ -58,6 +143,18 @@
   animation-delay: 300ms;
 }
 
+@keyframes loading-title-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes loading-dot {
   0%, 60%, 100% {
     opacity: 0.45;
@@ -67,5 +164,15 @@
   30% {
     opacity: 1;
     transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-page-logo,
+  .loading-page-splash,
+  .loading-page-title,
+  .loading-page-dots span {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
   }
 }

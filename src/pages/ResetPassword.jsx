@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import '../styles/auth.css'
 import { changeAccountPassword } from '../services/auth'
+import PasswordToggleIcon from '../components/PasswordToggleIcon'
 
 const STEP = { EMAIL: 'email', NEW_PASSWORD: 'new_password', DONE: 'done' }
 
@@ -11,6 +12,29 @@ export default function ResetPassword() {
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirm: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [visiblePasswords, setVisiblePasswords] = useState({
+    current: false,
+    newPassword: false,
+    confirm: false,
+  })
+
+  function togglePassword(field) {
+    setVisiblePasswords((visible) => ({ ...visible, [field]: !visible[field] }))
+  }
+
+  function getPasswordStrength(password) {
+    if (!password) return null
+    let score = 0
+    if (password.length >= 8) score++
+    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++
+    if (/\d/.test(password)) score++
+    if (/[^A-Za-z0-9]/.test(password)) score++
+    if (score <= 2) return { label: 'Weak', className: 'weak' }
+    if (score === 3) return { label: 'Medium', className: 'medium' }
+    return { label: 'Strong', className: 'strong' }
+  }
+
+  const passwordStrength = getPasswordStrength(form.newPassword)
 
   function handleEmailSubmit(e) {
     e.preventDefault()
@@ -27,6 +51,14 @@ export default function ResetPassword() {
   async function handlePasswordSubmit(e) {
     e.preventDefault()
     setError('')
+    if (form.newPassword.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+    if (!/\d/.test(form.newPassword) || !/[^A-Za-z0-9]/.test(form.newPassword)) {
+      setError('Password must include a number and a special character.')
+      return
+    }
     if (form.newPassword !== form.confirm) {
       setError('Passwords do not match.')
       return
@@ -91,44 +123,67 @@ export default function ResetPassword() {
               {error && <div className="error" role="alert">{error}</div>}
               <div className="field">
                 <label htmlFor="reset-current-password" className="label">Current password</label>
-                <input
-                  id="reset-current-password"
-                  name="currentPassword"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  className="input"
-                  value={form.currentPassword}
-                  onChange={(e) => { setForm((f) => ({ ...f, currentPassword: e.target.value })); setError('') }}
-                />
+                <div className="passwordInput">
+                  <input
+                    id="reset-current-password"
+                    name="currentPassword"
+                    type={visiblePasswords.current ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    required
+                    className="input"
+                    value={form.currentPassword}
+                    onChange={(e) => { setForm((f) => ({ ...f, currentPassword: e.target.value })); setError('') }}
+                  />
+                  <button type="button" className="passwordToggle" aria-label={visiblePasswords.current ? 'Hide current password' : 'Show current password'} aria-pressed={visiblePasswords.current} onClick={() => togglePassword('current')}>
+                    <PasswordToggleIcon visible={visiblePasswords.current} />
+                  </button>
+                </div>
               </div>
               <div className="field">
                 <label htmlFor="reset-new-password" className="label">New password</label>
-                <input
-                  id="reset-new-password"
-                  name="newPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  className="input"
-                  placeholder="At least 8 characters"
-                  value={form.newPassword}
-                  onChange={(e) => { setForm((f) => ({ ...f, newPassword: e.target.value })); setError('') }}
-                />
+                <div className="passwordInput">
+                  <input
+                    id="reset-new-password"
+                    name="newPassword"
+                    type={visiblePasswords.newPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    className="input"
+                    placeholder="At least 8 characters"
+                    value={form.newPassword}
+                    onChange={(e) => { setForm((f) => ({ ...f, newPassword: e.target.value })); setError('') }}
+                  />
+                  <button type="button" className="passwordToggle" aria-label={visiblePasswords.newPassword ? 'Hide new password' : 'Show new password'} aria-pressed={visiblePasswords.newPassword} onClick={() => togglePassword('newPassword')}>
+                    <PasswordToggleIcon visible={visiblePasswords.newPassword} />
+                  </button>
+                </div>
+                {passwordStrength && (
+                  <div className={`passwordStrength ${passwordStrength.className}`} aria-live="polite">
+                    <div className="passwordStrengthBar">
+                      <span /><span /><span />
+                    </div>
+                    <span>{passwordStrength.label} password</span>
+                  </div>
+                )}
               </div>
               <div className="field">
                 <label htmlFor="reset-confirm-password" className="label">Confirm new password</label>
-                <input
-                  id="reset-confirm-password"
-                  name="confirm"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  className="input"
-                  placeholder="Repeat your password"
-                  value={form.confirm}
-                  onChange={(e) => { setForm((f) => ({ ...f, confirm: e.target.value })); setError('') }}
-                />
+                <div className="passwordInput">
+                  <input
+                    id="reset-confirm-password"
+                    name="confirm"
+                    type={visiblePasswords.confirm ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    required
+                    className="input"
+                    placeholder="Repeat your password"
+                    value={form.confirm}
+                    onChange={(e) => { setForm((f) => ({ ...f, confirm: e.target.value })); setError('') }}
+                  />
+                  <button type="button" className="passwordToggle" aria-label={visiblePasswords.confirm ? 'Hide confirm password' : 'Show confirm password'} aria-pressed={visiblePasswords.confirm} onClick={() => togglePassword('confirm')}>
+                    <PasswordToggleIcon visible={visiblePasswords.confirm} />
+                  </button>
+                </div>
               </div>
               <button type="submit" className="btn" disabled={loading}>
                 {loading ? 'Saving…' : 'Save new password'}

@@ -9,13 +9,16 @@
   padding: 0;
   background: #fff;
 }
-.home-page.tasks-mode .home-mobile-nav { display: none; }
 
 .te-page {
   min-height: 100svh;
   background: #fff;
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   color: #18334a;
+}
+
+@media (max-width: 600px) {
+  .home-page.tasks-mode .te-page { padding-bottom: 70px; }
 }
 
 /* ── Hero banner ───────────────────────────────────────────── */
@@ -33,12 +36,10 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 194px;
+  height: calc(var(--app-page-header-height) + 24px);
   background-color: #1d66a4;
-  background-image:
-    linear-gradient(180deg, rgba(21, 100, 158, 0.06) 0%, rgba(35, 122, 170, 0.1) 54%, rgba(255, 255, 255, 0.96) 100%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 180' preserveAspectRatio='none'%3E%3Cpath fill='%230e426c' d='M0 180V135l18-33 18 33 16-56 22 56 19-40 20 40 18-75 24 75 20-50 20 50 17-92 23 92 18-56 21 56 18-72 24 72 16-43 21 43 20-86 24 86 19-58 20 58 22-74 23 74 18-46 22 46 20-86 24 86 18-56 24 56 17-72 22 72 18-47 20 47 20-87 24 87 18-64 22 64 18-45 20 45 21-70 22 70v45z'/%3E%3Cpath fill='%230a6688' opacity='.82' d='M0 180V151l15-40 18 40 18-60 19 60 17-35 19 35 20-74 21 74 18-47 20 47 18-61 20 61 19-39 20 39 20-79 21 79 19-53 20 53 18-65 22 65 19-41 19 41 22-76 21 76 18-51 20 51 18-67 22 67 19-43 20 43 20-80 22 80 20-55 18 55 18-60 22 60 20-42 19 42 21-77 21 77v29z'/%3E%3C/svg%3E");
-  background-position: center bottom;
+  background-image: var(--app-header-background);
+  background-position: center 35%;
   background-size: cover;
   pointer-events: none;
 }
@@ -398,14 +399,14 @@
 /* ── FAB ───────────────────────────────────────────────────── */
 .te-fab {
   position: fixed;
-  right: 29px;
+  right: 24px;
   bottom: 80px;
-  width: 38px; height: 38px;
+  width: 52px; height: 52px;
   border-radius: 50%;
   border: 0;
   background: #f6c400;
   color: #fff;
-  font-size: 27px;
+  font-size: 28px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(237,185,0,0.35);
@@ -417,7 +418,7 @@
 
 @media (min-width: 601px) {
   .te-hero { padding: 40px 30px 0; }
-  .te-hero::before { height: 220px; }
+  .te-hero::before { height: calc(var(--app-page-header-height) + 24px); }
   .te-hero-title h2 { max-width: 280px; font-size: 20px; }
   .te-hero-title p { font-size: 12px; }
   .te-hero-actions { gap: 14px; }
@@ -436,7 +437,7 @@
   .te-empty { padding-top: 48px; }
   .te-empty h3 { font-size: 16px; }
   .te-empty p { font-size: 13px; max-width: 420px; }
-  .te-fab { right: 36px; bottom: 36px; width: 52px; height: 52px; font-size: 30px; }
+  .te-fab { right: 36px; bottom: 36px; width: 52px; height: 52px; font-size: 28px; }
 }
 
 @media (max-width: 600px) {

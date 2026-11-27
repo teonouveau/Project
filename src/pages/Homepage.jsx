@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import startImage from '../assets/start-transparent.png'
 import '../styles/Home.css'
-import TasksEvents from './TasksEvents'
+import Navbar, { ScheduleIcon } from '../components/navbar'
+import { parseScheduleCsv, SCHEDULE_STORAGE_KEY } from '../services/schedule'
+import TasksEvents, { AddItemModal } from './TasksEvents'
 import Study from './Study'
 import GwaCalculato from './GwaCalculato'
 import Schedule from './Schedule'
@@ -12,44 +14,6 @@ const VERSES = [
   { text: '"I can do all things through Christ who strengthens me."', ref: '– Philippians 4:13' },
   { text: '"Study to show yourself approved unto God."', ref: '– 2 Timothy 2:15' },
   { text: '"The beginning of wisdom is this: Get wisdom."', ref: '– Proverbs 4:7' },
-]
-
-/* ── SVG Nav Icons ────────────────────────────────────────── */
-const IconHome = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-  </svg>
-)
-const IconTasks = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>
-  </svg>
-)
-const IconSchedule = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2"/>
-    <path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>
-  </svg>
-)
-const IconStudy = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-  </svg>
-)
-const IconGWA = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2"/>
-    <path d="M9 9h1.5a1.5 1.5 0 0 1 0 3H9v3M9 9V7M15 9v6M15 12h-2"/>
-  </svg>
-)
-
-const NAV_ITEMS = [
-  { key: 'home',     icon: <IconHome />,     label: 'Home' },
-  { key: 'tasks',    icon: <IconTasks />,    label: 'Tasks & Events' },
-  { key: 'schedule', icon: <IconSchedule />, label: 'Schedule' },
-  { key: 'study',    icon: <IconStudy />,    label: 'Study' },
-  { key: 'gwa',      icon: <IconGWA />,      label: 'GWA Calculator' },
 ]
 
 const DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
@@ -72,11 +36,42 @@ const SAMPLE_SCHEDULE = [
   { id: 1, name: 'No classes today', time: 'Have a great day!', color: 'green' },
 ]
 
+function readTaskArray(key) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || '[]')
+    return Array.isArray(saved) ? saved : []
+  } catch {
+    return []
+  }
+}
+
+function loadHomeTasks() {
+  const taskItems = readTaskArray('te_items')
+  const legacyTasks = readTaskArray('skwela_tasks')
+  if (!legacyTasks.length) return taskItems
+
+  const existingIds = new Set(taskItems.map(task => String(task.id)))
+  const migratedTasks = legacyTasks
+    .filter(task => !existingIds.has(String(task.id)))
+    .map(task => ({
+      ...task,
+      type: task.type || 'task',
+      category: task.category || 'General',
+      remindTime: task.remindTime || '07:00',
+      remindBefore: task.remindBefore ?? false,
+    }))
+  const combined = [...taskItems, ...migratedTasks]
+  localStorage.setItem('te_items', JSON.stringify(combined))
+  localStorage.removeItem('skwela_tasks')
+  return combined
+}
+
 /* ══════════════════════════════════════════════════════════════
    Homepage
    ══════════════════════════════════════════════════════════════ */
 export default function Homepage() {
   const navigate = useNavigate()
+  const location = useLocation()
 
   /* ── user ──────────────────────────────────────────────── */
   let user = null
@@ -90,25 +85,47 @@ export default function Homepage() {
 
   const verse = VERSES[new Date().getDay() % VERSES.length]
   const streak = Number(localStorage.getItem('skwela_streak') || 0)
+  const attendanceEnabled = localStorage.getItem('skwela_attendance_streak_enabled') !== 'false'
 
-  /* ── dashboard tasks (separate from Tasks & Events page) ── */
-  const [tasks, setTasks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('skwela_tasks')) || [] } catch { return [] }
-  })
-  function saveTasks(next) { setTasks(next); localStorage.setItem('skwela_tasks', JSON.stringify(next)) }
-  function toggleTask(id)  { saveTasks(tasks.map(t => t.id===id ? {...t, done:!t.done} : t)) }
-  function deleteTask(id)  { saveTasks(tasks.filter(t => t.id!==id)) }
+  /* ── dashboard tasks ────────────────────────────────────── */
+  const [tasks, setTasks] = useState(loadHomeTasks)
+  function saveTasks(next) {
+    setTasks(next)
+    localStorage.setItem('te_items', JSON.stringify(next))
+  }
+  function toggleTask(id) {
+    saveTasks(tasks.map(task => task.id === id
+      ? { ...task, done: !task.done, completedAt: !task.done ? new Date().toISOString() : undefined }
+      : task))
+  }
+  function deleteTask(id) { saveTasks(tasks.filter(task => task.id !== id)) }
 
-  const [newTask, setNewTask] = useState('')
-  const [newDue,  setNewDue]  = useState('')
-  const [inlineTaskOpen, setInlineTaskOpen] = useState(false)
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false)
   const [quickActionsOpen, setQuickActionsOpen] = useState(false)
-  function addTaskInline(e) {
-    e.preventDefault()
-    if (!newTask.trim()) return
-    saveTasks([...tasks, { id: Date.now(), name: newTask.trim(), due: newDue, done: false }])
-    setNewTask(''); setNewDue('')
-    setInlineTaskOpen(false)
+  const [scheduleImportOpen, setScheduleImportOpen] = useState(false)
+  const [scheduleImportError, setScheduleImportError] = useState('')
+  const scheduleFileRef = useRef(null)
+  function addHomeItem(item) {
+    saveTasks([...tasks, item])
+    setAddItemModalOpen(false)
+  }
+
+  async function handleScheduleUpload(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    try {
+      const importedClasses = parseScheduleCsv(await file.text())
+      localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(importedClasses))
+      setScheduleImportError('')
+      setScheduleImportOpen(false)
+      setActiveNav('schedule')
+    } catch (error) {
+      setScheduleImportError(
+        error instanceof Error ? error.message : 'Could not import this schedule file.',
+      )
+    }
   }
 
   /* ── study note modal ──────────────────────────────────── */
@@ -127,10 +144,29 @@ export default function Homepage() {
     document.addEventListener('mousedown', outside)
     return () => document.removeEventListener('mousedown', outside)
   }, [])
+  useEffect(() => {
+    if (!scheduleImportOpen) return undefined
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') {
+        setScheduleImportOpen(false)
+        setScheduleImportError('')
+      }
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [scheduleImportOpen])
   function handleLogout() { localStorage.removeItem('skwela_user'); navigate('/login') }
 
   /* ── active nav ────────────────────────────────────────── */
-  const [activeNav, setActiveNav] = useState('home')
+  const [activeNav, setActiveNav] = useState(() => (
+    Object.prototype.hasOwnProperty.call(PAGE_TITLES, location.state?.activePage)
+      ? location.state.activePage
+      : 'home'
+  ))
+  function handleNavigate(page) {
+    if (page === 'home') setTasks(loadHomeTasks())
+    setActiveNav(page)
+  }
 
   const doneTasks  = tasks.filter(t => t.done).length
   const totalTasks = tasks.length
@@ -146,18 +182,7 @@ export default function Homepage() {
           <span>ESKWELA TA</span>
         </div>
 
-        <nav className="home-sidebar-nav">
-          {NAV_ITEMS.map(({ key, icon, label }) => (
-            <button
-              key={key}
-              className={`home-nav-item${activeNav===key?' active':''}`}
-              onClick={() => setActiveNav(key)}
-            >
-              <span className="nav-icon">{icon}</span>
-              <small>{label}</small>
-            </button>
-          ))}
-        </nav>
+        <Navbar activePage={activeNav} onNavigate={handleNavigate} placement="sidebar" />
 
         <div className="home-sidebar-footer">
           <div className="home-sidebar-user">
@@ -203,10 +228,10 @@ export default function Homepage() {
                 aria-label="Open schedule"
                 onClick={() => setActiveNav('schedule')}
               >
-                <IconSchedule />
+                <ScheduleIcon />
               </button>
             </>
-          ) : activeNav !== 'study' && activeNav !== 'gwa' ? (
+          ) : attendanceEnabled && activeNav !== 'study' && activeNav !== 'gwa' ? (
             <div className="topbar-streak">
               <span>💧</span>
               <strong>{streak}</strong>
@@ -219,7 +244,7 @@ export default function Homepage() {
               {settingsOpen && (
                 <div className="settings-dropdown">
                   <button onClick={() => setSettingsOpen(false)}>👤 &nbsp;Profile</button>
-                  <button onClick={() => setSettingsOpen(false)}>⚙️ &nbsp;Settings</button>
+                  <button onClick={() => { setSettingsOpen(false); navigate('/settings') }}>⚙️ &nbsp;Settings</button>
                   <hr />
                   <button className="danger" onClick={handleLogout}>🚪 &nbsp;Sign out</button>
                 </div>
@@ -253,22 +278,16 @@ export default function Homepage() {
                 <small>{verse.ref}</small>
               </div>
               <div className="home-hero-spacer" />
-              <div className="home-hero-streak" aria-label={`${streak} day streak`}>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9.4 6.3 5.2 11 5.2 15.1a6.8 6.8 0 0 0 13.6 0C18.8 11 14.6 6.3 12 2.5Z" fill="currentColor"/><path d="M9 16.5a3 3 0 0 0 3 3" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                <span>{streak}</span>
-              </div>
-              <div className="home-hero-settings" ref={settingsRef}>
-                <button className="home-hero-settings-button" type="button" aria-label="Settings" title="Settings" onClick={() => setSettingsOpen(open => !open)}>
+              {attendanceEnabled && (
+                <div className="home-hero-streak" aria-label={`${streak} day streak`}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9.4 6.3 5.2 11 5.2 15.1a6.8 6.8 0 0 0 13.6 0C18.8 11 14.6 6.3 12 2.5Z" fill="currentColor"/><path d="M9 16.5a3 3 0 0 0 3 3" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  <span>{streak}</span>
+                </div>
+              )}
+              <div className="home-hero-settings">
+                <button className="home-hero-settings-button" type="button" aria-label="Settings" title="Settings" onClick={() => navigate('/settings')}>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13.5 21 14.7l-1.6 2.8-1.9-.8a7.8 7.8 0 0 1-1.6.9l-.3 2h-3.2l-.3-2a7.8 7.8 0 0 1-1.6-.9l-1.9.8L7 14.7l1.6-1.2a7 7 0 0 1 0-1.9L7 10.4l1.6-2.8 1.9.8a7.8 7.8 0 0 1 1.6-.9l.3-2h3.2l.3 2a7.8 7.8 0 0 1 1.6.9l1.9-.8 1.6 2.8-1.6 1.2a7 7 0 0 1 0 1.9ZM14 12a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z" fill="currentColor"/></svg>
                 </button>
-                {settingsOpen && (
-                  <div className="settings-dropdown">
-                    <button onClick={() => setSettingsOpen(false)}>👤 &nbsp;Profile</button>
-                    <button onClick={() => setSettingsOpen(false)}>⚙️ &nbsp;Settings</button>
-                    <hr />
-                    <button className="danger" onClick={handleLogout}>🚪 &nbsp;Sign out</button>
-                  </div>
-                )}
               </div>
             </section>
 
@@ -352,16 +371,13 @@ export default function Homepage() {
                   )}
 
                 </div>
-                {inlineTaskOpen ? (
-                  <form className="home-add-task-row" onSubmit={addTaskInline}>
-                    <input type="text" placeholder="Task name" value={newTask} onChange={e => setNewTask(e.target.value)} autoFocus />
-                    <input type="date" aria-label="Due date" value={newDue} onChange={e => setNewDue(e.target.value)} />
-                    <button type="submit">Add</button>
-                    <button type="button" className="home-add-task-cancel" onClick={() => { setInlineTaskOpen(false); setNewTask(''); setNewDue('') }}>Cancel</button>
-                  </form>
-                ) : (
-                  <button className="home-add-task-trigger" type="button" onClick={() => setInlineTaskOpen(true)}>＋ Add task</button>
-                )}
+                <button
+                  className="home-add-task-trigger"
+                  type="button"
+                  onClick={() => setAddItemModalOpen(true)}
+                >
+                  ＋ Add task
+                </button>
               </div>
 
               {/* Right */}
@@ -375,7 +391,7 @@ export default function Homepage() {
                     <div className="stat-box"><div className="stat-num">{totalTasks}</div><div className="stat-label">Total Tasks</div></div>
                     <div className="stat-box"><div className="stat-num">{doneTasks}</div><div className="stat-label">Completed</div></div>
                     <div className="stat-box"><div className="stat-num">{totalTasks-doneTasks}</div><div className="stat-label">Remaining</div></div>
-                    <div className="stat-box"><div className="stat-num">{streak}</div><div className="stat-label">Day Streak</div></div>
+                    {attendanceEnabled && <div className="stat-box"><div className="stat-num">{streak}</div><div className="stat-label">Day Streak</div></div>}
                   </div>
                 </div>
 
@@ -415,19 +431,7 @@ export default function Homepage() {
 
       </main>
 
-      <nav className="home-mobile-nav" aria-label="Main navigation">
-        {NAV_ITEMS.map(({ key, icon, label }) => (
-          <button
-            key={key}
-            className={`home-mobile-nav-item${activeNav === key ? ' active' : ''}`}
-            type="button"
-            onClick={() => setActiveNav(key)}
-          >
-            <span>{icon}</span>
-            <small>{key === 'tasks' ? 'Tasks & Events' : key === 'gwa' ? 'GWA Calculator' : label}</small>
-          </button>
-        ))}
-      </nav>
+      <Navbar activePage={activeNav} onNavigate={handleNavigate} />
 
       {activeNav === 'home' && (
         <>
@@ -438,7 +442,8 @@ export default function Homepage() {
                 className="home-quick-action"
                 onClick={() => {
                   setQuickActionsOpen(false)
-                  setActiveNav('schedule')
+                  setScheduleImportError('')
+                  setScheduleImportOpen(true)
                 }}
               >
                 <span>Upload schedule</span>
@@ -479,6 +484,81 @@ export default function Homepage() {
             {quickActionsOpen ? '×' : '+'}
           </button>
         </>
+      )}
+
+      {scheduleImportOpen && (
+        <div
+          className="schedule-import-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setScheduleImportOpen(false)
+              setScheduleImportError('')
+            }
+          }}
+        >
+          <section
+            className="schedule-import-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="schedule-import-title"
+          >
+            <header className="schedule-import-header">
+              <button
+                className="schedule-import-back"
+                type="button"
+                aria-label="Back"
+                onClick={() => {
+                  setScheduleImportOpen(false)
+                  setScheduleImportError('')
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m15 18-6-6 6-6M9 12h12" />
+                </svg>
+              </button>
+              <h2 id="schedule-import-title">Import Schedule</h2>
+              <span aria-hidden="true" />
+            </header>
+            <button
+              className="schedule-import-upload"
+              type="button"
+              autoFocus
+              onClick={() => scheduleFileRef.current?.click()}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5h14v-5" />
+              </svg>
+              Upload schedule
+            </button>
+            <input
+              ref={scheduleFileRef}
+              className="schedule-import-input"
+              type="file"
+              accept=".csv,text/csv"
+              aria-label="Choose a schedule CSV file"
+              onChange={handleScheduleUpload}
+            />
+            {scheduleImportError && (
+              <p className="schedule-import-error" role="alert">{scheduleImportError}</p>
+            )}
+            <span className="schedule-import-or">Or</span>
+            <button
+              className="schedule-import-manual"
+              type="button"
+              onClick={() => {
+                setScheduleImportOpen(false)
+                setScheduleImportError('')
+                setActiveNav('schedule')
+              }}
+            >
+              EDIT schedule manually
+            </button>
+          </section>
+        </div>
+      )}
+
+      {addItemModalOpen && (
+        <AddItemModal onClose={() => setAddItemModalOpen(false)} onAdd={addHomeItem} />
       )}
 
       {/* ── Study Note Modal ─────────────────────────────────── */}

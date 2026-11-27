@@ -1,12 +1,16 @@
 :root {
+  --brand-blue: #0334d6;
+  --brand-blue-rgb: 3, 52, 214;
+  --app-header-background: linear-gradient(180deg, rgba(13, 58, 101, 0.42) 0%, rgba(20, 91, 135, 0.22) 54%, #fff 100%), url("./assets/header.png");
+  --app-page-header-height: 194px;
   --text: #6b6375;
   --text-h: #08060d;
   --bg: #fff;
   --border: #e5e4e7;
   --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
+  --accent: var(--brand-blue);
+  --accent-bg: rgba(var(--brand-blue-rgb), 0.1);
+  --accent-border: rgba(var(--brand-blue-rgb), 0.5);
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
@@ -27,6 +31,12 @@
 
   @media (max-width: 1024px) {
     font-size: 16px;
+  }
+}
+
+@media (min-width: 601px) {
+  :root {
+    --app-page-header-height: 220px;
   }
 }
 

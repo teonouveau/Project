@@ -338,7 +338,7 @@ function TaskFormModal({ onClose, onAdd, editItem }) {
 
           <div className="te-form-actions">
             <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="submit" className="te-btn-submit">
+            <button type="submit" className="te-btn-submit" style={{ background:'#f5a623' }}>
               {editItem ? 'Save Changes' : 'Add Task'}
             </button>
           </div>
@@ -431,6 +431,18 @@ function EventFormModal({ onClose, onAdd, editItem }) {
       </div>
     </div>
   )
+}
+
+export function AddItemModal({ onClose, onAdd }) {
+  const [modal, setModal] = useState('choose')
+
+  if (modal === 'choose') {
+    return <ChooseTypeSheet onClose={onClose} onChoose={setModal} />
+  }
+  if (modal === 'task') {
+    return <TaskFormModal onClose={onClose} onAdd={onAdd} />
+  }
+  return <EventFormModal onClose={onClose} onAdd={onAdd} />
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -591,7 +603,7 @@ function ChecklistModal({ onClose, onAdd }) {
           {err && <p style={{color:'#d9534f',fontSize:11,margin:'-10px 0 10px'}}>Item text is required.</p>}
           <div className="te-form-actions">
             <button type="button" className="te-btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="submit" className="te-btn-submit" style={{ background:'#f5a623' }}>
+            <button type="submit" className="te-btn-submit">
               Add Item
             </button>
           </div>
@@ -652,14 +664,18 @@ function ItemDetailModal({ item, onClose, onEdit, onDelete, onToggle }) {
             <span>📊</span>
             <div>
               <strong>Status</strong>
-              <span>{item.done ? `Completed on ${new Date(item.completedAt).toLocaleDateString()}` : 'Pending'}</span>
+              <span>{item.done
+                ? item.completedAt ? `Completed on ${new Date(item.completedAt).toLocaleDateString()}` : 'Completed'
+                : 'Pending'}</span>
             </div>
           </div>
           <div className="te-detail-row">
             <span>🕐</span>
             <div>
               <strong>Created</strong>
-              <span>{new Date(item.createdAt).toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'})}</span>
+              <span>{item.createdAt
+                ? new Date(item.createdAt).toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'})
+                : 'Unknown'}</span>
             </div>
           </div>
         </div>
@@ -886,6 +902,14 @@ export default function TasksEvents() {
 
   /* ── reminder check on mount ──────────────────────────── */
   useEffect(() => {
+    let setup = {}
+    try {
+      setup = JSON.parse(localStorage.getItem('skwela_setup') || '{}')
+    } catch {
+      setup = {}
+    }
+    if (setup?.notifications === false) return
+
     const now = new Date()
     const todayStr = todayISO()
     const tomorrowStr = addDays(todayStr, 1)

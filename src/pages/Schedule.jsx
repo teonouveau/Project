@@ -1,9 +1,9 @@
-import { useState } from "react";
-import "./sched.css";
+import { useEffect, useState } from "react";
+import { SCHEDULE_STORAGE_KEY } from "../services/schedule";
+import "../styles/sched.css";
 
-const STORAGE_KEY = "skwela_schedule";
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const START_HOUR = 7;
 const END_HOUR = 17;
 const GRID_DURATION = (END_HOUR - START_HOUR) * 60;
@@ -30,7 +30,7 @@ const DEFAULT_CLASSES = [
 const COLORS = ["blue", "green", "purple", "yellow", "red"];
 function readClasses() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const saved = JSON.parse(localStorage.getItem(SCHEDULE_STORAGE_KEY));
     if (Array.isArray(saved)) return saved;
   } catch (error) {
     console.error("Could not read the saved schedule.", error);
@@ -54,15 +54,22 @@ function formatHour(hour) {
 }
 
 function classOnDate(item, date) {
-  const day = date.getDay();
-  return day !== 0 && item.day === day - 1;
+  return item.day === (date.getDay() + 6) % 7;
 }
 
 function Schedule() {
+  useEffect(() => {
+    const scrollRoots = [document.documentElement, document.body];
+    scrollRoots.forEach((root) => root.classList.add("schedule-scrollbar-hidden"));
+    return () => {
+      scrollRoots.forEach((root) => root.classList.remove("schedule-scrollbar-hidden"));
+    };
+  }, []);
+
   const [classes, setClasses] = useState(readClasses);
   const [view, setView] = useState("weekly");
   const [semester, setSemester] = useState("1st sem");
-  const [showSaturday, setShowSaturday] = useState(false);
+  const [showWeekend, setShowWeekend] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [error, setError] = useState("");
@@ -73,7 +80,7 @@ function Schedule() {
 
   function persist(nextClasses) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextClasses));
+      localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(nextClasses));
       setClasses(nextClasses);
       setError("");
       setDialog(null);
@@ -156,7 +163,7 @@ function Schedule() {
     persist(classes.filter((item) => item.id !== id));
   }
 
-  const dayCount = showSaturday ? 6 : 5;
+  const dayCount = showWeekend ? DAYS.length : 5;
   const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, index) => START_HOUR + index);
   const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
   const monthDays = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
@@ -297,8 +304,8 @@ function Schedule() {
             <section className="schedule-dialog" role="dialog" aria-modal="true" aria-labelledby="schedule-settings-title">
               <h2 id="schedule-settings-title">Schedule settings</h2>
               <label className="schedule-checkbox">
-                <input type="checkbox" checked={showSaturday} onChange={(event) => setShowSaturday(event.target.checked)} />
-                Show Saturday in weekly view
+                <input type="checkbox" checked={showWeekend} onChange={(event) => setShowWeekend(event.target.checked)} />
+                Show Saturday and Sunday in weekly view
               </label>
               <div className="schedule-dialog-actions"><button type="button" onClick={() => setDialog(null)}>Done</button></div>
             </section>
