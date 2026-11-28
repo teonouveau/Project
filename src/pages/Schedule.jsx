@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { SCHEDULE_STORAGE_KEY } from "../services/schedule";
+import { useEffect, useRef, useState } from "react";
+import scheduleHeaderImage from "../assets/mysched_header.png";
+import { DEFAULT_CLASSES, SCHEDULE_STORAGE_KEY } from "../services/schedule";
 import "../styles/sched.css";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -7,26 +8,6 @@ const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satu
 const START_HOUR = 7;
 const END_HOUR = 17;
 const GRID_DURATION = (END_HOUR - START_HOUR) * 60;
-const DEFAULT_CLASSES = [
-  { id: 1, day: 0, name: "PC 315L", instructor: "Abrigana, W", room: "CL3", start: "07:30", end: "08:30", color: "blue" },
-  { id: 2, day: 0, name: "PC 318", instructor: "Enoc, AB", room: "LLR1", start: "09:00", end: "10:00", color: "green" },
-  { id: 3, day: 0, name: "CC 316", instructor: "Culanibang, JR", room: "CL3", start: "10:00", end: "11:00", color: "purple" },
-  { id: 4, day: 1, name: "PC 315L", instructor: "Abrigana, W", room: "CL3", start: "07:30", end: "10:00", color: "blue" },
-  { id: 5, day: 1, name: "CC 316", instructor: "Culanibang, JR", room: "CL3", start: "10:00", end: "11:00", color: "purple" },
-  { id: 6, day: 1, name: "PC 315", instructor: "Abrigana, W", room: "CL3", start: "13:00", end: "15:00", color: "yellow" },
-  { id: 7, day: 2, name: "PC 318", instructor: "Enoc, AB", room: "LLR1", start: "09:00", end: "10:00", color: "green" },
-  { id: 8, day: 2, name: "CC 316", instructor: "Culanibang, JR", room: "CL3", start: "10:00", end: "11:00", color: "purple" },
-  { id: 9, day: 2, name: "PC 317", instructor: "Narte, K", room: "CL3", start: "13:30", end: "15:30", color: "red" },
-  { id: 10, day: 3, name: "PC 315L", instructor: "Abrigana, W", room: "CL3", start: "07:30", end: "09:00", color: "blue" },
-  { id: 11, day: 3, name: "PC 318", instructor: "Enoc, AB", room: "LLR1", start: "09:00", end: "10:30", color: "green" },
-  { id: 12, day: 3, name: "PC 316", instructor: "Abrigana, W", room: "CL3", start: "13:00", end: "14:00", color: "yellow" },
-  { id: 13, day: 3, name: "PC 317", instructor: "Narte, K", room: "CL3", start: "14:00", end: "16:00", color: "red" },
-  { id: 14, day: 4, name: "PC 315L", instructor: "Abrigana, W", room: "CL3", start: "07:30", end: "09:00", color: "blue" },
-  { id: 15, day: 4, name: "PC 318", instructor: "Enoc, AB", room: "LLR1", start: "10:00", end: "11:00", color: "green" },
-  { id: 16, day: 4, name: "PC 317", instructor: "Narte, K", room: "CL3", start: "12:30", end: "13:30", color: "red" },
-  { id: 17, day: 4, name: "PC 316", instructor: "Abrigana, W", room: "CL3", start: "13:30", end: "14:30", color: "yellow" },
-];
-
 const COLORS = ["blue", "green", "purple", "yellow", "red"];
 function readClasses() {
   try {
@@ -57,6 +38,112 @@ function classOnDate(item, date) {
   return item.day === (date.getDay() + 6) % 7;
 }
 
+function drawSchedulePreview(canvas, headerImage, classes, dayCount) {
+  const width = 1000;
+  const headerHeight = Math.round(width * headerImage.naturalHeight / headerImage.naturalWidth);
+  const tableX = 28;
+  const tableWidth = width - tableX * 2;
+  const timeWidth = 120;
+  const headerRowHeight = 58;
+  const hourHeight = 78;
+  const gridTop = headerHeight + 32;
+  const gridHeight = hourHeight * (END_HOUR - START_HOUR);
+  const height = gridTop + headerRowHeight + gridHeight + 32;
+
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Could not create the schedule image canvas.");
+
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(headerImage, 0, 0, width, headerHeight);
+
+  const columnWidth = (tableWidth - timeWidth) / dayCount;
+  context.fillStyle = "#e6e8e9";
+  context.fillRect(tableX, gridTop, timeWidth, headerRowHeight);
+  context.fillStyle = "#292d30";
+  context.font = "700 18px system-ui, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText("TIME", tableX + timeWidth / 2, gridTop + headerRowHeight / 2);
+
+  DAYS.slice(0, dayCount).forEach((day, index) => {
+    const x = tableX + timeWidth + index * columnWidth;
+    context.fillStyle = "#0876d1";
+    context.fillRect(x, gridTop, columnWidth, headerRowHeight);
+    context.fillStyle = "#081e31";
+    context.font = "600 18px system-ui, sans-serif";
+    context.fillText(day, x + columnWidth / 2, gridTop + headerRowHeight / 2);
+  });
+
+  for (let hour = 0; hour <= END_HOUR - START_HOUR; hour += 1) {
+    const y = gridTop + headerRowHeight + hour * hourHeight;
+    context.fillStyle = "#f8f8f8";
+    context.fillRect(tableX, y, timeWidth, hourHeight);
+    context.fillStyle = "#fff";
+    context.fillRect(tableX + timeWidth, y, tableWidth - timeWidth, hourHeight);
+    context.strokeStyle = "#d5dce1";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(tableX, y);
+    context.lineTo(tableX + tableWidth, y);
+    context.stroke();
+    context.fillStyle = "#3a4045";
+    context.font = "14px system-ui, sans-serif";
+    context.textAlign = "left";
+    context.fillText(formatHour(START_HOUR + hour), tableX + 6, y + 18);
+  }
+
+  for (let column = 0; column <= dayCount; column += 1) {
+    const x = tableX + timeWidth + column * columnWidth;
+    context.strokeStyle = "#d5dce1";
+    context.beginPath();
+    context.moveTo(x, gridTop);
+    context.lineTo(x, gridTop + headerRowHeight + gridHeight);
+    context.stroke();
+  }
+  context.strokeStyle = "#d5dce1";
+  context.strokeRect(tableX, gridTop, tableWidth, headerRowHeight + gridHeight);
+
+  const colors = {
+    blue: "#4269e8",
+    green: "#35cf40",
+    purple: "#ce36d6",
+    yellow: "#f3c928",
+    red: "#f21e23",
+  };
+  const fontSize = dayCount > 5 ? 14 : 17;
+  const lineHeight = fontSize * 1.25;
+  classes.filter((item) => item.day < dayCount).forEach((item) => {
+    const x = tableX + timeWidth + item.day * columnWidth + 6;
+    const y = gridTop + headerRowHeight
+      + ((timeToMinutes(item.start) - START_HOUR * 60) / 60) * hourHeight + 4;
+    const cardWidth = columnWidth - 12;
+    const cardHeight = ((timeToMinutes(item.end) - timeToMinutes(item.start)) / 60) * hourHeight - 8;
+    context.save();
+    context.shadowColor = "rgba(20, 32, 45, 0.24)";
+    context.shadowBlur = 8;
+    context.shadowOffsetY = 3;
+    context.fillStyle = colors[item.color] || colors.blue;
+    context.beginPath();
+    context.roundRect(x, y, cardWidth, cardHeight, 14);
+    context.fill();
+    context.restore();
+
+    const details = [item.name, item.instructor, item.room].filter(Boolean);
+    const visibleDetails = details.slice(0, Math.max(1, Math.floor((cardHeight - 12) / lineHeight)));
+    const firstLineY = y + cardHeight / 2 - ((visibleDetails.length - 1) * lineHeight) / 2;
+    context.fillStyle = "#fff";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    visibleDetails.forEach((detail, index) => {
+      context.font = `${index === 0 ? "700" : "500"} ${fontSize}px system-ui, sans-serif`;
+      context.fillText(detail, x + cardWidth / 2, firstLineY + index * lineHeight, cardWidth - 10);
+    });
+  });
+}
+
 function Schedule() {
   useEffect(() => {
     const scrollRoots = [document.documentElement, document.body];
@@ -73,10 +160,50 @@ function Schedule() {
   const [editMode, setEditMode] = useState(false);
   const [dialog, setDialog] = useState(null);
   const [error, setError] = useState("");
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const [imagePreviewReady, setImagePreviewReady] = useState(false);
+  const [imagePreviewError, setImagePreviewError] = useState("");
+  const imageCanvas = useRef(null);
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
+  useEffect(() => {
+    if (!imagePreviewOpen) return undefined;
+
+    const canvas = imageCanvas.current;
+    if (!canvas) return undefined;
+
+    let cancelled = false;
+    setImagePreviewReady(false);
+    setImagePreviewError("");
+
+    const headerImage = new Image();
+    headerImage.onload = () => {
+      if (cancelled) return;
+      try {
+        drawSchedulePreview(canvas, headerImage, classes, showWeekend ? DAYS.length : 5);
+        setImagePreviewReady(true);
+      } catch (renderError) {
+        console.error("Could not render the schedule image.", renderError);
+        setImagePreviewError("Could not create the schedule image preview.");
+      }
+    };
+    headerImage.onerror = () => {
+      if (cancelled) return;
+      const loadError = new Error("The schedule header image could not be loaded.");
+      console.error("Could not load the schedule image header.", loadError);
+      setImagePreviewError("Could not load the schedule header image.");
+    };
+    headerImage.src = scheduleHeaderImage;
+
+    return () => {
+      cancelled = true;
+      headerImage.onload = null;
+      headerImage.onerror = null;
+    };
+  }, [classes, imagePreviewOpen, showWeekend]);
 
   function persist(nextClasses) {
     try {
@@ -90,25 +217,30 @@ function Schedule() {
     }
   }
 
-  function exportSchedule() {
-    const header = ["Day", "Course", "Instructor", "Room", "Start", "End"];
-    const rows = classes.map((item) => [
-      DAY_NAMES[item.day] || "Saturday",
-      item.name,
-      item.instructor,
-      item.room,
-      formatTime(item.start),
-      formatTime(item.end),
-    ]);
-    const csv = [header, ...rows]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
-      .join("\r\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "my-schedule.csv";
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  function downloadScheduleImage() {
+    const canvas = imageCanvas.current;
+    if (!canvas || !imagePreviewReady) return;
+
+    try {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          const downloadError = new Error("The schedule image could not be created.");
+          console.error("Could not create the schedule image download.", downloadError);
+          setImagePreviewError("Could not create the schedule image. Please try again.");
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "my-schedule.png";
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }, "image/png");
+    } catch (downloadError) {
+      console.error("Could not download the schedule image.", downloadError);
+      setImagePreviewError("Could not download the schedule image. Please try again.");
+    }
   }
 
   function openNewClass(day = 0, start = "08:00") {
@@ -172,6 +304,40 @@ function Schedule() {
     { length: Math.ceil((monthOffset + monthDays) / 7) * 7 },
     (_, index) => index - monthOffset + 1,
   );
+
+  if (imagePreviewOpen) {
+    return (
+      <main className="schedule-image-page">
+        <header className="schedule-image-header">
+          <button type="button" className="schedule-image-back" aria-label="Back to schedule" onClick={() => setImagePreviewOpen(false)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6M9 12h12" /></svg>
+          </button>
+          <div>
+            <h1>Schedule Image</h1>
+            <p>Save it below to print or share! <span aria-hidden="true">✨</span></p>
+          </div>
+        </header>
+
+        <button type="button" className="schedule-image-download" disabled={!imagePreviewReady} onClick={downloadScheduleImage}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 20h16" /></svg>
+          Download
+        </button>
+        <p className="schedule-image-customize">Want to download a customized image?</p>
+        <p className="schedule-image-preview-label">Preview</p>
+        <div className="schedule-image-preview">
+          {!imagePreviewReady && !imagePreviewError && <p role="status">Preparing image preview…</p>}
+          {imagePreviewError && <p role="alert">{imagePreviewError}</p>}
+          <canvas
+            ref={imageCanvas}
+            className={`schedule-image-canvas${imagePreviewReady ? " ready" : ""}`}
+            role="img"
+            aria-label="Preview of your weekly class schedule"
+          />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="schedule-page">
       <header className="schedule-banner">
@@ -198,7 +364,13 @@ function Schedule() {
             >
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17.25 11.06-11.06 3.75 3.75L6.75 21H3v-3.75ZM16.94 4.56l1.5-1.5a1.414 1.414 0 0 1 2 0l1 1a1.414 1.414 0 0 1 0 2l-1.5 1.5-3-3Z" fill="currentColor"/></svg>
             </button>
-            <button type="button" className="schedule-icon-button" aria-label="Download schedule" title="Download schedule as CSV" onClick={exportSchedule}>
+            <button
+              type="button"
+              className="schedule-icon-button"
+              aria-label="Preview schedule image"
+              title="Preview and download schedule image"
+              onClick={() => setImagePreviewOpen(true)}
+            >
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20h14v-2H5v2ZM11 3h2v9h4l-5 5-5-5h4V3Z" fill="currentColor"/></svg>
             </button>
             <button type="button" className="schedule-icon-button" aria-label="Schedule settings" title="Schedule settings" onClick={() => setDialog({ settings: true })}>

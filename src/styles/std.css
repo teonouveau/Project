@@ -546,9 +546,10 @@
 
 .study-reviewer-progress span {
   display: block;
-  width: 100%;
   height: 100%;
+  border-radius: inherit;
   background: #0878d1;
+  transition: width 100ms linear;
 }
 
 .study-reviewer-ready {
@@ -560,6 +561,21 @@
   background: #25c999;
   color: #fff;
   font-size: 10px;
+}
+
+.study-reviewer-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #d5e8f7;
+  border-top-color: #0878d1;
+  border-radius: 50%;
+  animation: study-reviewer-spin 700ms linear infinite;
+}
+
+@keyframes study-reviewer-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .study-reviewer-file button {
@@ -587,6 +603,21 @@
 .study-reviewer-next:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .study-reviewer-spinner {
+    animation: none;
+    border-top-color: #0878d1;
+  }
+
+  .study-reviewer-progress span {
+    transition: none;
+  }
+
+  .study-generate-progress-track span {
+    transition: none;
+  }
 }
 
 .study-generate-dialog {
@@ -679,9 +710,27 @@
 }
 
 .study-generate-reviewer strong {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   margin-top: 5px;
   color: #7b8a96;
   font-size: 9px;
+}
+
+.study-generate-reviewer strong.ready {
+  color: #159d77;
+}
+
+.study-generate-reviewer strong.generating {
+  color: #0878d1;
+}
+
+.study-generate-reviewer .study-reviewer-spinner {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
 }
 
 .study-generate-progress {
@@ -692,10 +741,19 @@
   margin: 12px 0 14px;
 }
 
-.study-generate-progress span {
+.study-generate-progress-track {
   height: 5px;
   border-radius: 999px;
+  background: #e2e7ec;
+  overflow: hidden;
+}
+
+.study-generate-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
   background: #0878d1;
+  transition: width 50ms linear;
 }
 
 .study-generate-progress small {
@@ -703,6 +761,11 @@
   font-size: 9px;
   font-weight: 700;
   text-align: right;
+}
+
+.study-generate-finish:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .study-generate-finish {

@@ -22,7 +22,7 @@ export default function Login() {
     setError('')
     try {
       await loginAccount(form.email, form.password)
-      navigate('/setup')
+      navigate('/homepage', { replace: true })
     } catch (err) {
       setError(err.message || 'Unable to sign in.')
     } finally {
@@ -94,7 +94,7 @@ export default function Login() {
 
         <p className="foot">
           Don't have an account?{' '}
-          <Link to="/signup" className="link">Sign Up</Link>
+          <Link to="/signup" state={{ authEntry: true }} className="link">Sign Up</Link>
         </p>
       </div>
     </div>

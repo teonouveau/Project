@@ -52,7 +52,7 @@ export default function Register() {
     setError('')
     try {
       await registerAccount(form)
-      navigate('/login', { replace: true })
+      navigate('/login', { replace: true, state: { authEntry: true } })
     } catch (err) {
       setError(err.message || 'Unable to create account.')
     } finally {
@@ -172,7 +172,7 @@ export default function Register() {
 
         <p className="foot">
           Already have an account?{' '}
-          <Link to="/login" className="link">Sign in</Link>
+          <Link to="/login" state={{ authEntry: true }} className="link">Sign in</Link>
         </p>
       </div>
     </div>

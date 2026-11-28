@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import startImage from "../assets/start-transparent.png";
 import nameStepImage from "../assets/start1-transparent.png";
 import owl1Image from "../assets/owl1-transparent.png";
@@ -7,7 +7,7 @@ import owl2Image from "../assets/owl2-transparent.png";
 import "../styles/Set.css";
 
 const steps = [
-  { title: "Ready to start your success?", text: "Plan ahead with your schedule, stay organized, and achieve your goals." },
+  { title: "Ready to set up your classes?", text: "Manage your schedule, tasks, and grade in one place." },
   { title: "What should we call you?", text: "A name makes your experience feel more personal.", field: "name" },
   { title: "Pick your look.", text: "Choose the appearance you prefer.", field: "theme" },
   { title: "Add your schedule now?", text: "You can add your class schedule now, or do it later from the Schedule tab.", field: "schedule" },
@@ -72,6 +72,7 @@ export default function Setup() {
       "skwela_setup",
       JSON.stringify({
         name: name.trim(),
+        setupComplete: true,
         theme,
         schedule: scheduleChoice === "later" ? "Later" : schedule,
         notifications,
@@ -136,6 +137,11 @@ export default function Setup() {
           />
           <h1>{current.title}</h1>
           <p className="setup-description">{current.text}</p>
+          {step === 0 && (
+            <Link className="setup-auth-link" to="/login" state={{ authEntry: true }}>
+              Already have an account? Sign in and skip this
+            </Link>
+          )}
 
           {current.field === "name" && (
             <label className="setup-field">

@@ -26,6 +26,133 @@ body.schedule-scrollbar-hidden::-webkit-scrollbar {
   font-family: system-ui, "Segoe UI", Roboto, sans-serif;
 }
 
+.schedule-image-page {
+  min-height: 100svh;
+  padding-bottom: 30px;
+  background: #f7f8fa;
+  color: #173a56;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+.schedule-image-header {
+  display: flex;
+  min-height: 94px;
+  align-items: center;
+  gap: 12px;
+  background-color: #1d5e98;
+  background-image: var(--app-header-background);
+  background-position: center 35%;
+  background-size: cover;
+  padding: 18px 16px;
+  color: #fff;
+}
+
+.schedule-image-back {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  color: #17456d;
+  cursor: pointer;
+}
+
+.schedule-image-back svg,
+.schedule-image-download svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.schedule-image-header h1 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.schedule-image-header p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+}
+
+.schedule-image-download {
+  display: flex;
+  width: calc(100% - 32px);
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px auto 0;
+  border: 0;
+  border-radius: 9px;
+  background: #07508a;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.schedule-image-download:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.schedule-image-customize {
+  margin: 7px 16px 0;
+  color: #0876d1;
+  text-align: center;
+  font-size: 8px;
+}
+
+.schedule-image-preview-label {
+  margin: 12px 16px 7px;
+  color: #8c939a;
+  font-size: 9px;
+}
+
+.schedule-image-preview {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 16px;
+  border: 1px solid #e3e7ea;
+  border-radius: 7px;
+  background: #fff;
+  padding: 8px;
+  box-shadow: 0 2px 4px rgba(27, 44, 58, 0.19);
+}
+
+.schedule-image-preview > p {
+  color: #718697;
+  font-size: 11px;
+}
+
+.schedule-image-preview > p[role="alert"] {
+  color: #bb3030;
+}
+
+.schedule-image-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  visibility: hidden;
+}
+
+.schedule-image-canvas.ready {
+  visibility: visible;
+}
+
 .schedule-banner {
   position: relative;
   z-index: 1;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
@@ -9,23 +9,41 @@ import Setup from "./pages/Setup";
 import Settings from "./pages/settings";
 
 function PrivateRoute({ children }) {
-  let user = null;
-  try {
-    user = JSON.parse(localStorage.getItem("skwela_user"));
-  } catch {
-    localStorage.removeItem("skwela_user");
-  }
-  return user ? children : <Navigate to="/login" replace />;
+  return hasStoredUser() || hasCompletedSetup()
+    ? children
+    : <Navigate to="/setup" replace />;
 }
 
 function GuestRoute({ children }) {
-  let user = null;
+  return hasStoredUser() ? <Navigate to="/homepage" replace /> : children;
+}
+
+function AuthEntryRoute({ children }) {
+  const location = useLocation();
+  return location.state?.authEntry === true
+    ? children
+    : <Navigate to="/setup" replace />;
+}
+
+function hasStoredUser() {
   try {
-    user = JSON.parse(localStorage.getItem("skwela_user"));
+    return Boolean(JSON.parse(localStorage.getItem("skwela_user")));
   } catch {
     localStorage.removeItem("skwela_user");
+    return false;
   }
-  return user ? <Navigate to="/homepage" replace /> : children;
+}
+
+function hasCompletedSetup() {
+  try {
+    return JSON.parse(localStorage.getItem("skwela_setup") || "{}").setupComplete === true;
+  } catch {
+    return false;
+  }
+}
+
+function getStartupPath() {
+  return hasStoredUser() || hasCompletedSetup() ? "/homepage" : "/setup";
 }
 
 export default function App() {
@@ -54,15 +72,29 @@ export default function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to={getStartupPath()} replace />} />
 
         <Route path="/setup" element={<Setup />} />
 
-        <Route path="/signup" element={<Register />} />
+        <Route
+          path="/signup"
+          element={(
+            <AuthEntryRoute>
+              <Register />
+            </AuthEntryRoute>
+          )}
+        />
 
         <Route path="/register" element={<Navigate to="/signup" replace />} />
 
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={(
+            <AuthEntryRoute>
+              <Login />
+            </AuthEntryRoute>
+          )}
+        />
 
         <Route
           path="/reset-password"
@@ -93,7 +125,7 @@ export default function App() {
 
         <Route path="/dashboard" element={<Navigate to="/homepage" replace />} />
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );

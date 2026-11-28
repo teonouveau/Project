@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import startImage from '../assets/start-transparent.png'
 import '../styles/Home.css'
 import Navbar, { ScheduleIcon } from '../components/navbar'
-import { parseScheduleCsv, SCHEDULE_STORAGE_KEY } from '../services/schedule'
+import ClassReminderNotification from '../components/ClassReminderNotification'
+import { DEFAULT_CLASSES, parseScheduleCsv, SCHEDULE_STORAGE_KEY } from '../services/schedule'
 import TasksEvents, { AddItemModal } from './TasksEvents'
 import Study from './Study'
 import GwaCalculato from './GwaCalculato'
@@ -32,10 +33,6 @@ const PAGE_TITLES = {
   gwa: 'GWA Calculator',
 }
 
-const SAMPLE_SCHEDULE = [
-  { id: 1, name: 'No classes today', time: 'Have a great day!', color: 'green' },
-]
-
 function readTaskArray(key) {
   try {
     const saved = JSON.parse(localStorage.getItem(key) || '[]')
@@ -43,6 +40,61 @@ function readTaskArray(key) {
   } catch {
     return []
   }
+}
+
+function isValidScheduleClass(item) {
+  return item
+    && Number.isInteger(item.day)
+    && item.day >= 0
+    && item.day < 7
+    && typeof item.name === 'string'
+    && /^\d{2}:\d{2}$/.test(item.start)
+    && /^\d{2}:\d{2}$/.test(item.end)
+    && item.end > item.start
+}
+
+function readScheduleClasses() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SCHEDULE_STORAGE_KEY))
+    return Array.isArray(saved) ? saved : DEFAULT_CLASSES
+  } catch (error) {
+    console.error('Could not read the saved schedule.', error)
+    return DEFAULT_CLASSES
+  }
+}
+
+function scheduleTimeInMinutes(time) {
+  const [hours, minutes] = time.split(':').map(Number)
+  return hours * 60 + minutes
+}
+
+function formatScheduleTime(time) {
+  const [hours, minutes] = time.split(':').map(Number)
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours >= 12 ? 'PM' : 'AM'}`
+}
+
+function getUpcomingSchedule(classes, now) {
+  const todayIndex = (now.getDay() + 6) % 7
+  return classes.filter(isValidScheduleClass).map(item => {
+    const startMinutes = scheduleTimeInMinutes(item.start)
+    const endMinutes = scheduleTimeInMinutes(item.end)
+    const daysAhead = (item.day - todayIndex + 7) % 7
+    const startsAt = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + daysAhead,
+      Math.floor(startMinutes / 60),
+      startMinutes % 60,
+    )
+    const endsAt = new Date(startsAt.getTime() + (endMinutes - startMinutes) * 60_000)
+
+    if (endsAt <= now) {
+      startsAt.setDate(startsAt.getDate() + 7)
+      endsAt.setDate(endsAt.getDate() + 7)
+    }
+
+    return { ...item, startsAt, endsAt }
+  }).sort((first, second) => first.startsAt - second.startsAt)
 }
 
 function loadHomeTasks() {
@@ -89,6 +141,8 @@ export default function Homepage() {
 
   /* ── dashboard tasks ────────────────────────────────────── */
   const [tasks, setTasks] = useState(loadHomeTasks)
+  const [scheduleClasses, setScheduleClasses] = useState(readScheduleClasses)
+  const [scheduleTime, setScheduleTime] = useState(() => new Date())
   function saveTasks(next) {
     setTasks(next)
     localStorage.setItem('te_items', JSON.stringify(next))
@@ -99,6 +153,22 @@ export default function Homepage() {
       : task))
   }
   function deleteTask(id) { saveTasks(tasks.filter(task => task.id !== id)) }
+
+  useEffect(() => {
+    function refreshSchedule() {
+      setScheduleClasses(readScheduleClasses())
+      setScheduleTime(new Date())
+    }
+
+    const clock = window.setInterval(() => setScheduleTime(new Date()), 30_000)
+    window.addEventListener('focus', refreshSchedule)
+    window.addEventListener('storage', refreshSchedule)
+    return () => {
+      window.clearInterval(clock)
+      window.removeEventListener('focus', refreshSchedule)
+      window.removeEventListener('storage', refreshSchedule)
+    }
+  }, [])
 
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
   const [quickActionsOpen, setQuickActionsOpen] = useState(false)
@@ -118,6 +188,8 @@ export default function Homepage() {
     try {
       const importedClasses = parseScheduleCsv(await file.text())
       localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(importedClasses))
+      setScheduleClasses(importedClasses)
+      setScheduleTime(new Date())
       setScheduleImportError('')
       setScheduleImportOpen(false)
       setActiveNav('schedule')
@@ -164,12 +236,43 @@ export default function Homepage() {
       : 'home'
   ))
   function handleNavigate(page) {
-    if (page === 'home') setTasks(loadHomeTasks())
+    if (page === 'home') {
+      setTasks(loadHomeTasks())
+      setScheduleClasses(readScheduleClasses())
+      setScheduleTime(new Date())
+    }
     setActiveNav(page)
   }
 
   const doneTasks  = tasks.filter(t => t.done).length
   const totalTasks = tasks.length
+  const currentMinutes = scheduleTime.getHours() * 60 + scheduleTime.getMinutes()
+  const todayIndex = (scheduleTime.getDay() + 6) % 7
+  const todayClasses = scheduleClasses
+    .filter(item => isValidScheduleClass(item) && item.day === todayIndex)
+    .sort((first, second) => scheduleTimeInMinutes(first.start) - scheduleTimeInMinutes(second.start))
+  const currentClass = todayClasses.find(item => (
+    scheduleTimeInMinutes(item.start) <= currentMinutes
+    && scheduleTimeInMinutes(item.end) > currentMinutes
+  ))
+  const nextTodayClass = todayClasses.find(item => scheduleTimeInMinutes(item.start) > currentMinutes)
+  const scheduledOccurrences = getUpcomingSchedule(scheduleClasses, scheduleTime)
+  const nearestUpcomingClass = scheduledOccurrences.find(item => item.startsAt > scheduleTime)
+  const upcomingClasses = scheduledOccurrences.slice(0, 3)
+  const todayHeadline = currentClass
+    ? `${currentClass.name} is in progress`
+    : nextTodayClass
+      ? `Next class: ${nextTodayClass.name}`
+      : todayClasses.length
+        ? 'All classes finished'
+        : 'No classes today'
+  const todayMessage = currentClass
+    ? `Until ${formatScheduleTime(currentClass.end)}${currentClass.room ? ` · ${currentClass.room}` : ''}`
+    : nextTodayClass
+      ? `${formatScheduleTime(nextTodayClass.start)}${nextTodayClass.room ? ` · ${nextTodayClass.room}` : ''}`
+      : todayClasses.length
+        ? `You had ${todayClasses.length} ${todayClasses.length === 1 ? 'class' : 'classes'} today.`
+        : 'Enjoy your break, bro.'
 
   /* ── render ────────────────────────────────────────────── */
   return (
@@ -302,8 +405,8 @@ export default function Homepage() {
                     <path d="M18 13.5v13a5 5 0 0 1 5-4h5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round"/>
                   </svg>
                   <div>
-                  <h2>No classes today</h2>
-                  <p>Enjoy your break, bro.</p>
+                  <h2>{todayHeadline}</h2>
+                  <p>{todayMessage}</p>
                   </div>
                 </div>
 
@@ -318,17 +421,35 @@ export default function Homepage() {
                 </button>
 
                 {/* Classes card */}
-                <div className="home-card" style={{ marginBottom:20 }}>
+                <div className="home-card home-classes-card">
                   <div className="home-card-header">
                     <div className="home-card-title"><span className="home-section-line" />Classes</div>
-                    <span className="home-card-count">0/0</span>
+                    <span className="home-card-count">{nearestUpcomingClass ? '0/1' : '0/0'}</span>
                   </div>
-                  <div className="home-card-body">
-                    <div className="home-empty">
-                      <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10l-1 5 4 3v2H4v-2l4-3-1-5ZM8 13l1.5 3h5L16 13M7 20h10M9 16v2m6-2v2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round"/></svg></span>
-                      <p>No classes today</p>
+                  {!nearestUpcomingClass ? (
+                    <div className="home-card-body">
+                      <div className="home-empty">
+                        <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h10l-1 5 4 3v2H4v-2l4-3-1-5ZM8 13l1.5 3h5L16 13M7 20h10M9 16v2m6-2v2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round"/></svg></span>
+                        <p>No upcoming classes</p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="home-card-body home-class-list" aria-label="Next upcoming class">
+                      <div className="home-class-item" key={nearestUpcomingClass.id}>
+                        <div className={`schedule-dot ${nearestUpcomingClass.color || 'blue'}`} />
+                        <div className="home-class-info">
+                          <div className="schedule-name">{nearestUpcomingClass.name}</div>
+                          <div className="schedule-time">
+                            {nearestUpcomingClass.startsAt.toDateString() === scheduleTime.toDateString()
+                              ? ''
+                              : `${nearestUpcomingClass.startsAt.toLocaleDateString(undefined, { weekday: 'short' })} · `}
+                            {formatScheduleTime(nearestUpcomingClass.start)} – {formatScheduleTime(nearestUpcomingClass.end)}
+                          </div>
+                          <div className="home-class-status upcoming">Up next</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Tasks card */}
@@ -401,15 +522,33 @@ export default function Homepage() {
                     <div className="home-card-title"><span className="home-section-line" />Upcoming</div>
                   </div>
                   <div className="schedule-list">
-                    {SAMPLE_SCHEDULE.map(s => (
-                      <div key={s.id} className="schedule-item">
-                        <div className={`schedule-dot ${s.color}`} />
+                    {upcomingClasses.length ? upcomingClasses.map(classItem => {
+                      const inProgress = classItem.startsAt <= scheduleTime && classItem.endsAt > scheduleTime
+                      const dayLabel = classItem.startsAt.toDateString() === scheduleTime.toDateString()
+                        ? 'Today'
+                        : classItem.startsAt.toLocaleDateString(undefined, { weekday: 'short' })
+                      return (
+                        <div key={classItem.id} className="schedule-item">
+                          <div className={`schedule-dot ${classItem.color || 'blue'}`} />
+                          <div className="schedule-info">
+                            <div className="schedule-name">{classItem.name}</div>
+                            <div className="schedule-time">
+                              {inProgress
+                                ? `Now · until ${formatScheduleTime(classItem.end)}`
+                                : `${dayLabel} · ${formatScheduleTime(classItem.start)}`}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }) : (
+                      <div className="schedule-item">
+                        <div className="schedule-dot" />
                         <div className="schedule-info">
-                          <div className="schedule-name">{s.name}</div>
-                          <div className="schedule-time">{s.time}</div>
+                          <div className="schedule-name">No upcoming classes</div>
+                          <div className="schedule-time">Add classes to your schedule</div>
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
 
@@ -432,6 +571,12 @@ export default function Homepage() {
       </main>
 
       <Navbar activePage={activeNav} onNavigate={handleNavigate} />
+
+      <ClassReminderNotification
+        classItem={nearestUpcomingClass}
+        displayName={displayName}
+        scheduleTime={scheduleTime}
+      />
 
       {activeNav === 'home' && (
         <>

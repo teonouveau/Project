@@ -118,7 +118,7 @@ export default function Settings() {
           <p>{user ? user.email || "Your account is signed in." : "Sign in to sync your data."}</p>
           <button
             type="button"
-            onClick={user ? signOut : () => navigate("/login")}
+            onClick={user ? signOut : () => navigate("/login", { state: { authEntry: true } })}
           >
             {user ? "Sign out" : "Sign in"}
           </button>

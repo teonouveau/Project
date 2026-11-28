@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "../styles/std.css";
 
 export default function Study() {
@@ -9,9 +9,33 @@ export default function Study() {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [files, setFiles] = useState([]);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [generateProgress, setGenerateProgress] = useState(0);
   const [questionFormat, setQuestionFormat] = useState("MCQ");
   const [questionCount, setQuestionCount] = useState("10");
   const [difficulty, setDifficulty] = useState("Moderate");
+
+  useEffect(() => {
+    if (!files.some((item) => item.progress < 100)) return undefined;
+
+    const timer = window.setInterval(() => {
+      setFiles((currentFiles) => currentFiles.map((item) => ({
+        ...item,
+        progress: Math.min(100, item.progress + 10),
+      })));
+    }, 100);
+
+    return () => window.clearInterval(timer);
+  }, [files]);
+
+  useEffect(() => {
+    if (!generateOpen || generateProgress >= 100) return undefined;
+
+    const timer = window.setTimeout(() => {
+      setGenerateProgress((progress) => Math.min(100, progress + 5));
+    }, 50);
+
+    return () => window.clearTimeout(timer);
+  }, [generateOpen, generateProgress]);
 
   function openFilePicker() {
     fileInput.current?.click();
@@ -21,22 +45,24 @@ export default function Study() {
     const newFiles = Array.from(event.target.files || []);
     setFiles((currentFiles) => [
       ...currentFiles,
-      ...newFiles.filter((file) => !currentFiles.some(
-        (currentFile) =>
-          currentFile.name === file.name &&
-          currentFile.size === file.size &&
-          currentFile.lastModified === file.lastModified,
-      )),
+      ...newFiles
+        .filter((file) => !currentFiles.some(
+          (currentItem) =>
+            currentItem.file.name === file.name &&
+            currentItem.file.size === file.size &&
+            currentItem.file.lastModified === file.lastModified,
+        ))
+        .map((file) => ({ file, progress: 0 })),
     ]);
     event.target.value = "";
   }
 
   function removeFile(fileToRemove) {
-    setFiles((currentFiles) => currentFiles.filter((file) => file !== fileToRemove));
+    setFiles((currentFiles) => currentFiles.filter((item) => item.file !== fileToRemove));
   }
 
   function finishUpload() {
-    setSelectedDocuments(files);
+    setSelectedDocuments(files.map((item) => item.file));
     setFiles([]);
     setUploadOpen(false);
   }
@@ -277,15 +303,32 @@ export default function Study() {
 
             {files.length > 0 && (
               <div className="study-reviewer-files" aria-live="polite">
-                {files.map((file) => (
+                {files.map(({ file, progress }) => (
                   <div className="study-reviewer-file" key={`${file.name}-${file.size}-${file.lastModified}`}>
                     <span className="study-reviewer-pdf">PDF</span>
                     <div>
                       <strong>{file.name}</strong>
-                      <div className="study-reviewer-progress"><span /></div>
-                      <small>{file.size ? `${Math.max(1, Math.round(file.size / 1024 / 1024 * 10) / 10)} MB` : ""} • Ready</small>
+                      <div
+                        className="study-reviewer-progress"
+                        role="progressbar"
+                        aria-label={`Uploading ${file.name}`}
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow={progress}
+                      >
+                        <span style={{ width: `${progress}%` }} />
+                      </div>
+                      <small>
+                        {file.size ? `${Math.max(1, Math.round(file.size / 1024 / 1024 * 10) / 10)} MB` : ""}
+                        {" · "}
+                        {progress < 100 ? `Uploading ${progress}%` : "Ready"}
+                      </small>
                     </div>
-                    <span className="study-reviewer-ready" aria-label="Ready">✓</span>
+                    {progress === 100 ? (
+                      <span className="study-reviewer-ready" aria-label="Ready">✓</span>
+                    ) : (
+                      <span className="study-reviewer-spinner" role="status" aria-label={`Uploading ${progress}%`} />
+                    )}
                     <button type="button" aria-label={`Remove ${file.name}`} onClick={() => removeFile(file)}>×</button>
                   </div>
                 ))}
@@ -295,9 +338,10 @@ export default function Study() {
             <button
               type="button"
               className="study-reviewer-next"
-              disabled={files.length === 0}
+              disabled={files.length === 0 || files.some((file) => file.progress < 100)}
               onClick={() => {
                 setReviewerOpen(false);
+                setGenerateProgress(0);
                 setGenerateOpen(true);
               }}
             >
@@ -327,22 +371,39 @@ export default function Study() {
 
             <div className="study-generate-file">
               <span className="study-generate-pdf">PDF</span>
-              <strong>{files[0]?.name || "SASWEEK14.pdf"}</strong>
+              <strong>{files[0]?.file.name || "SASWEEK14.pdf"}</strong>
             </div>
 
             <div className="study-generate-arrow" aria-hidden="true">↓</div>
 
             <div className="study-generate-reviewer">
-              <span>{files[0]?.name || "SASWEEK14.pdf"}&nbsp; Reviewer.pdf</span>
-              <strong>Ready!</strong>
+              <span>{files[0]?.file.name || "SASWEEK14.pdf"}&nbsp; Reviewer.pdf</span>
+              <strong className={generateProgress === 100 ? "ready" : "generating"} role="status">
+                {generateProgress < 100 && <span className="study-reviewer-spinner" aria-hidden="true" />}
+                {generateProgress < 100 ? "Generating..." : "Ready!"}
+              </strong>
             </div>
 
-            <div className="study-generate-progress">
-              <span />
-              <small>100%</small>
+            <div
+              className="study-generate-progress"
+              role="progressbar"
+              aria-label="Generating reviewer"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={generateProgress}
+            >
+              <span className="study-generate-progress-track">
+                <span style={{ width: `${generateProgress}%` }} />
+              </span>
+              <small>{generateProgress}%</small>
             </div>
 
-            <button type="button" className="study-generate-finish" onClick={finishUpload}>
+            <button
+              type="button"
+              className="study-generate-finish"
+              disabled={generateProgress < 100}
+              onClick={finishUpload}
+            >
               Finish Now
             </button>
           </section>

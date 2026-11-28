@@ -19,6 +19,25 @@ const DAY_INDEX = {
 const COLORS = ["blue", "green", "purple", "yellow", "red"];
 const START_MINUTES = 7 * 60;
 const END_MINUTES = 17 * 60;
+export const DEFAULT_CLASSES = [
+  { id: 1, day: 0, name: "PC 315L", instructor: "Abrigana, W", room: "CL3", start: "07:30", end: "08:30", color: "blue" },
+  { id: 2, day: 0, name: "PC 318", instructor: "Enoc, AB", room: "LLR1", start: "09:00", end: "10:00", color: "green" },
+  { id: 3, day: 0, name: "CC 316", instructor: "Culanibang, JR", room: "CL3", start: "10:00", end: "11:00", color: "purple" },
+  { id: 4, day: 1, name: "PC 315L", instructor: "Abrigana, W", room: "CL3", start: "07:30", end: "10:00", color: "blue" },
+  { id: 5, day: 1, name: "CC 316", instructor: "Culanibang, JR", room: "CL3", start: "10:00", end: "11:00", color: "purple" },
+  { id: 6, day: 1, name: "PC 315", instructor: "Abrigana, W", room: "CL3", start: "13:00", end: "15:00", color: "yellow" },
+  { id: 7, day: 2, name: "PC 318", instructor: "Enoc, AB", room: "LLR1", start: "09:00", end: "10:00", color: "green" },
+  { id: 8, day: 2, name: "CC 316", instructor: "Culanibang, JR", room: "CL3", start: "10:00", end: "11:00", color: "purple" },
+  { id: 9, day: 2, name: "PC 317", instructor: "Narte, K", room: "CL3", start: "13:30", end: "15:30", color: "red" },
+  { id: 10, day: 3, name: "PC 315L", instructor: "Abrigana, W", room: "CL3", start: "07:30", end: "09:00", color: "blue" },
+  { id: 11, day: 3, name: "PC 318", instructor: "Enoc, AB", room: "LLR1", start: "09:00", end: "10:30", color: "green" },
+  { id: 12, day: 3, name: "PC 316", instructor: "Abrigana, W", room: "CL3", start: "13:00", end: "14:00", color: "yellow" },
+  { id: 13, day: 3, name: "PC 317", instructor: "Narte, K", room: "CL3", start: "14:00", end: "16:00", color: "red" },
+  { id: 14, day: 4, name: "PC 315L", instructor: "Abrigana, W", room: "CL3", start: "07:30", end: "09:00", color: "blue" },
+  { id: 15, day: 4, name: "PC 318", instructor: "Enoc, AB", room: "LLR1", start: "10:00", end: "11:00", color: "green" },
+  { id: 16, day: 4, name: "PC 317", instructor: "Narte, K", room: "CL3", start: "12:30", end: "13:30", color: "red" },
+  { id: 17, day: 4, name: "PC 316", instructor: "Abrigana, W", room: "CL3", start: "13:30", end: "14:30", color: "yellow" },
+];
 
 function parseCsvRows(text) {
   const rows = [];

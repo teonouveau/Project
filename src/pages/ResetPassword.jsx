@@ -197,7 +197,7 @@ export default function ResetPassword() {
             <div className="successIcon">✓</div>
             <h1 className="title">Password updated</h1>
             <p className="subtitle">Your password has been changed successfully.</p>
-            <Link to="/login" className="btn" style={{ display: 'block', textAlign: 'center', marginTop: '24px' }}>
+            <Link to="/login" state={{ authEntry: true }} className="btn" style={{ display: 'block', textAlign: 'center', marginTop: '24px' }}>
               Back to sign in
             </Link>
           </div>
@@ -206,7 +206,7 @@ export default function ResetPassword() {
         {step !== STEP.DONE && (
           <p className="foot">
             Remembered it?{' '}
-            <Link to="/login" className="link">Sign in</Link>
+            <Link to="/login" state={{ authEntry: true }} className="link">Sign in</Link>
           </p>
         )}
       </div>
